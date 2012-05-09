@@ -1,6 +1,7 @@
 package cz.muni.fi.coffei.addressbook.gui;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -10,7 +11,9 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Collections;
 import java.util.List;
+import java.util.ResourceBundle;
 
+import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.GroupLayout;
@@ -36,6 +39,9 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.text.JTextComponent;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import cz.muni.fi.pv168.DBUtils;
 import cz.muni.fi.pv168.Group;
 import cz.muni.fi.pv168.GroupManager;
@@ -44,6 +50,11 @@ import cz.muni.fi.pv168.PersonManager;
 import cz.muni.fi.pv168.ServiceFailureException;
 
 public class GroupForm extends JDialog {
+	
+	private static final ResourceBundle BUNDLE = ResourceBundle
+			.getBundle("cz.muni.fi.coffei.addressbook.gui.Windows"); //$NON-NLS-1$
+
+	private static final Logger log = LoggerFactory.getLogger(GroupForm.class);
 
 	private final JPanel contentPanel = new JPanel();
 	private DefaultListModel<BoolWrapper<Person>> model;
@@ -54,6 +65,7 @@ public class GroupForm extends JDialog {
 
 	/**
 	 * Launch the application.
+	 * @throws ServiceFailureException 
 	 */
 	public static void main(String[] args) { //temporary, for testing only
 		for(LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
@@ -70,13 +82,17 @@ public class GroupForm extends JDialog {
 		}
 
 		try {
-			GroupForm dialog = new GroupForm(null);
+			GroupManager man = DBUtils.getAppContext().getBean("groupManager", GroupManager.class);
+			GroupForm dialog = new GroupForm(man.findGroupById(1L));
 			dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
 			dialog.setVisible(true);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		
+		
 	}
+	
 
 	/**
 	 * Create a dialog.
@@ -85,7 +101,7 @@ public class GroupForm extends JDialog {
 	public GroupForm(Group group) {
 		this.group = group;
 
-		setTitle("Group form");
+		setTitle(BUNDLE.getString("GroupForm.title"));
 
 		setBounds(100, 100, 500, 340);
 		setMinimumSize(new Dimension(200, 200));
@@ -93,9 +109,9 @@ public class GroupForm extends JDialog {
 		contentPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
 		getContentPane().add(contentPanel, BorderLayout.CENTER);
 		JPanel panel = new JPanel();
-		panel.setBorder(new TitledBorder(null, "Basic", TitledBorder.LEADING, TitledBorder.TOP, null, null));
+		panel.setBorder(new TitledBorder(null, BUNDLE.getString("GroupForm.basics"), TitledBorder.LEADING, TitledBorder.TOP, null, null));
 		JPanel panel_1 = new JPanel();
-		panel_1.setBorder(new TitledBorder(null, "People", TitledBorder.LEADING, TitledBorder.TOP, null, null));
+		panel_1.setBorder(new TitledBorder(null, BUNDLE.getString("GroupForm.members"), TitledBorder.LEADING, TitledBorder.TOP, null, null));
 		GroupLayout gl_contentPanel = new GroupLayout(contentPanel);
 		gl_contentPanel.setHorizontalGroup(
 				gl_contentPanel.createParallelGroup(Alignment.LEADING)
@@ -136,19 +152,30 @@ public class GroupForm extends JDialog {
 			panel.add(panel_2);
 			panel_2.setLayout(new BorderLayout(7, 0));
 			{
-				JLabel lblName = new JLabel("Name");
+				JLabel lblName = new JLabel(BUNDLE.getString("GroupForm.name"));
 				panel_2.add(lblName, BorderLayout.WEST);
 			}
 
 
-			JTextPane nameText = new JTextPane();
+			nameText = new JTextPane();
 			nameText.setPreferredSize(new Dimension(12, 12));
 			nameText.setInputVerifier(new InputVerifier() {
 				public boolean verify(JComponent input) { //put all verification-dependent code here
 					String text = ((JTextComponent)input).getText();
-					return text!=null && !text.isEmpty() && text.length() < 255;
+					if(text==null || text.isEmpty() || text.length() > 255) {
+						input.setBorder(BorderFactory.createLineBorder(Color.red, 1));
+						okButton.setEnabled(false);
+						return false;
+					} else {
+						input.setBorder(null);
+						okButton.setEnabled(true);
+						return true;
+					}
+					
 				}
 			});
+			if(group!=null)
+				nameText.setText(group.getName());
 			panel_2.add(nameText);
 		}
 		contentPanel.setLayout(gl_contentPanel);
@@ -157,7 +184,7 @@ public class GroupForm extends JDialog {
 			buttonPane.setLayout(new FlowLayout(FlowLayout.RIGHT));
 			getContentPane().add(buttonPane, BorderLayout.SOUTH);
 			{
-				JButton okButton = new JButton("OK");
+				okButton = new JButton(BUNDLE.getString("GroupForm.save"));
 				okButton.addActionListener(new ActionListener() {
 					public void actionPerformed(ActionEvent e) {
 						okClicked(e);
@@ -168,7 +195,7 @@ public class GroupForm extends JDialog {
 				getRootPane().setDefaultButton(okButton);
 			}
 			{
-				JButton cancelButton = new JButton("Cancel");
+				JButton cancelButton = new JButton(BUNDLE.getString("GroupForm.cancel"));
 				cancelButton.addActionListener(new ActionListener() {
 					public void actionPerformed(ActionEvent e) {
 						cancelClicked(e);
@@ -196,6 +223,7 @@ public class GroupForm extends JDialog {
 				}
 			} catch (ServiceFailureException e) {
 				//TODO: exception handling
+				log.error("DataStore error", e);
 			}
 		}
 
@@ -217,27 +245,30 @@ public class GroupForm extends JDialog {
 	protected void okClicked(ActionEvent e) {// Find changes and save them
 		GroupManager groupman = DBUtils.getAppContext().getBean("groupManager", GroupManager.class);
 
-		//Name
 		try {
-
-			for(Person p : assignedPeople) {
-				if(!model.contains(new BoolWrapper<Person>(p))) {
-					groupman.removePersonFromGroup(p, group);
-				}
+			if(!nameText.getText().equals(group.getName())) {
+				group.setName(nameText.getText());
+				groupman.updateGroup(group);
 			}
 
-			for (int i = 0; i < model.getSize(); i++) {
+
+			for (int i = 0; i < model.getSize(); i++) { //iterate over all BoolWrapers in model
 				BoolWrapper<Person> w = model.get(i);
-				if(w.value && !assignedPeople.contains(w.object)) {
+				if(w.value && !assignedPeople.contains(w.object)) {//add people
 					groupman.addPersonToGroup(w.object, group);
+				}
+				else if(!w.value && assignedPeople.contains(w.object)) {//remove people
+					groupman.removePersonFromGroup(w.object, group);
 				}
 			}
 
 		} catch (ServiceFailureException sfex) {
-			//TODO:Exception handling
+			//TODO: Exception handling
+			log.error("DataStore error", e);
 		}
 
-
+		this.setVisible(false);
+		this.dispose();
 
 	}
 
@@ -271,6 +302,8 @@ public class GroupForm extends JDialog {
 			return check;
 		}
 	};
+	private JButton okButton;
+	private JTextPane nameText;
 
 
 
