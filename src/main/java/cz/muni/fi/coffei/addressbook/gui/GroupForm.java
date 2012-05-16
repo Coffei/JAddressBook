@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
@@ -12,6 +13,7 @@ import java.awt.event.MouseEvent;
 import java.util.Collections;
 import java.util.List;
 import java.util.ResourceBundle;
+import java.util.concurrent.ExecutionException;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -25,13 +27,17 @@ import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
-import javax.swing.JTextPane;
+import javax.swing.JTextField;
 import javax.swing.LayoutStyle.ComponentPlacement;
 import javax.swing.ListCellRenderer;
 import javax.swing.ListModel;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
 import javax.swing.UIManager;
 import javax.swing.UIManager.LookAndFeelInfo;
 import javax.swing.UnsupportedLookAndFeelException;
@@ -41,6 +47,7 @@ import javax.swing.text.JTextComponent;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
 
 import cz.muni.fi.pv168.DBUtils;
 import cz.muni.fi.pv168.Group;
@@ -49,24 +56,46 @@ import cz.muni.fi.pv168.Person;
 import cz.muni.fi.pv168.PersonManager;
 import cz.muni.fi.pv168.ServiceFailureException;
 
+
+/**
+ * JDialog for creating and editing Groups
+ * @author Coffei
+ *
+ */
 public class GroupForm extends JDialog {
 	
+	/**
+	 * generated serialID
+	 */
+	private static final long serialVersionUID = -236097638646306386L;
+
 	private static final ResourceBundle BUNDLE = ResourceBundle
 			.getBundle("cz.muni.fi.coffei.addressbook.gui.Windows"); //$NON-NLS-1$
 
 	private static final Logger log = LoggerFactory.getLogger(GroupForm.class);
 
+	
+	
 	private final JPanel contentPanel = new JPanel();
-	private DefaultListModel<BoolWrapper<Person>> model;
+	private JButton okButton;
+	private JTextField nameText;
+	private JList<BoolWrapper<Person>> list;
+	private JLabel loadText;
+	private JPanel buttonPanel;
+	private JPanel loadPanel;
 
-	private final Group group;
+	private Group group;
 	private List<Person> assignedPeople = Collections.emptyList();
+	
+	
+	private ApplicationContext appCtx = null;
 
 
 	/**
-	 * Launch the application.
+	 * Launch the application. Later to be removed
 	 * @throws ServiceFailureException 
 	 */
+	@Deprecated
 	public static void main(String[] args) { //temporary, for testing only
 		for(LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
 			if(info.getName().toLowerCase().contains("nimbus")) {
@@ -82,8 +111,7 @@ public class GroupForm extends JDialog {
 		}
 
 		try {
-			GroupManager man = DBUtils.getAppContext().getBean("groupManager", GroupManager.class);
-			GroupForm dialog = new GroupForm(man.findGroupById(1L));
+			GroupForm dialog = new GroupForm(null, null);
 			dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
 			dialog.setVisible(true);
 		} catch (Exception e) {
@@ -93,13 +121,18 @@ public class GroupForm extends JDialog {
 		
 	}
 	
+	
 
 	/**
 	 * Create a dialog.
 	 * @param group group to be modified or null if creating new
+	 * @param parent parent window of this dialog if set this window will be centered accordingly, can be null
+	 * @see JDialog.setModalityType
 	 */
-	public GroupForm(Group group) {
+	public GroupForm(Group group, Window parent) {
+		super(parent);
 		this.group = group;
+		
 
 		setTitle(BUNDLE.getString("GroupForm.title"));
 
@@ -131,12 +164,11 @@ public class GroupForm extends JDialog {
 		scrollPane.setBorder(null);
 		panel_1.add(scrollPane, BorderLayout.CENTER);
 
-		JList<BoolWrapper<Person>> list = new JList<BoolWrapper<Person>>();
-		list.setBackground(UIManager.getColor("List.background"));
+		list = new JList<BoolWrapper<Person>>();
 		list.setLayoutOrientation(JList.VERTICAL_WRAP);
+		list.setBackground(UIManager.getColor("List.background"));
 		list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		list.setCellRenderer(CHECKBOX_LIST_RENDERER);
-		list.setModel(loadPeople());
 		list.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
@@ -157,7 +189,7 @@ public class GroupForm extends JDialog {
 			}
 
 
-			nameText = new JTextPane();
+			nameText = new JTextField();
 			nameText.setPreferredSize(new Dimension(12, 12));
 			nameText.setInputVerifier(new InputVerifier() {
 				public boolean verify(JComponent input) { //put all verification-dependent code here
@@ -180,9 +212,9 @@ public class GroupForm extends JDialog {
 		}
 		contentPanel.setLayout(gl_contentPanel);
 		{
-			JPanel buttonPane = new JPanel();
-			buttonPane.setLayout(new FlowLayout(FlowLayout.RIGHT));
-			getContentPane().add(buttonPane, BorderLayout.SOUTH);
+			buttonPanel = new JPanel();
+			buttonPanel.setLayout(new FlowLayout(FlowLayout.RIGHT));
+			getContentPane().add(buttonPanel, BorderLayout.SOUTH);
 			{
 				okButton = new JButton(BUNDLE.getString("GroupForm.save"));
 				okButton.addActionListener(new ActionListener() {
@@ -191,7 +223,7 @@ public class GroupForm extends JDialog {
 					}
 				});
 				okButton.setActionCommand("OK");
-				buttonPane.add(okButton);
+				buttonPanel.add(okButton);
 				getRootPane().setDefaultButton(okButton);
 			}
 			{
@@ -202,29 +234,83 @@ public class GroupForm extends JDialog {
 					}
 				});
 				cancelButton.setActionCommand("Cancel");
-				buttonPane.add(cancelButton);
+				buttonPanel.add(cancelButton);
 			}
 		}
+		
+		loadPanel = new JPanel();
+		getContentPane().add(loadPanel, BorderLayout.NORTH);
+		loadPanel.setLayout(new BoxLayout(loadPanel, BoxLayout.Y_AXIS));
+		
+		loadText = new JLabel();
+		loadText.setBorder(new EmptyBorder(30, 0, 5, 0));
+		loadText.setAlignmentX(Component.CENTER_ALIGNMENT);
+		loadPanel.add(loadText);
+		
+		JProgressBar progressBar = new JProgressBar();
+		progressBar.setIndeterminate(true);
+		loadPanel.add(progressBar);
+		
+		(new LoadingWorker()).execute();
+	}
+	
+	/**
+	 * Notifies a user of an exception
+	 * @param e exception to be notified
+	 * @param closeOnFinish whether to close the window afterwards
+	 */
+	private void notifyOfException(Exception e, final boolean closeOnFinish) {
+		final String message, title;
+
+		if(e instanceof ServiceFailureException) {
+			message = BUNDLE.getString("Exceptions.serviceFailure.message") 
+					+ (closeOnFinish? "\n" + BUNDLE.getString("Exceptions.windowWillClose") : "");
+
+			title = BUNDLE.getString("Exceptions.serviceFailure.title");
+
+		} else {
+
+			message = BUNDLE.getString("Exceptions.general.message") 
+					+ (closeOnFinish? "\n" + BUNDLE.getString("Exceptions.windowWillClose") : "");
+
+			title = BUNDLE.getString("Exceptions.general.title");
+
+		}
+
+
+		SwingUtilities.invokeLater(new Runnable() {
+
+			@Override
+			public void run() {
+				JOptionPane.showMessageDialog(GroupForm.this, message, title, JOptionPane.ERROR_MESSAGE);
+				if (closeOnFinish) {
+					GroupForm.this.setVisible(false);
+					GroupForm.this.dispose();
+				}
+
+			}
+		});
 	}
 
 	/**
 	 * Loads people from data source and creates according ListModel.
 	 * @param group group to edit, null if creating new
 	 * @return ListModel ready to assign to JList
+	 * @throws ServiceFailureException 
 	 */
-	private ListModel<BoolWrapper<Person>> loadPeople() {
-		GroupManager groupman = DBUtils.getAppContext().getBean("groupManager", GroupManager.class);
+	private ListModel<BoolWrapper<Person>> loadPeople() throws ServiceFailureException {
+		if(appCtx==null)
+			appCtx = DBUtils.getAppContext();
+
+		GroupManager groupman = appCtx.getBean("groupManager", GroupManager.class);
 		PersonManager personman = DBUtils.getAppContext().getBean("personManager", PersonManager.class);
-		model = new DefaultListModel<>();
+		DefaultListModel<BoolWrapper<Person>> model = new DefaultListModel<>();
 		if(group!=null) {
-			try {
-				for(Person p : (assignedPeople = groupman.findAllPersonsInGroup(group))) {
-					model.addElement(new BoolWrapper<Person>(p, true));
-				}
-			} catch (ServiceFailureException e) {
-				//TODO: exception handling
-				log.error("DataStore error", e);
+
+			for(Person p : (assignedPeople = groupman.findAllPersonsInGroup(group))) {
+				model.addElement(new BoolWrapper<Person>(p, true));
 			}
+
 		}
 
 		List<Person> allPeople = personman.findAllPersons();
@@ -243,33 +329,7 @@ public class GroupForm extends JDialog {
 	}
 
 	protected void okClicked(ActionEvent e) {// Find changes and save them
-		GroupManager groupman = DBUtils.getAppContext().getBean("groupManager", GroupManager.class);
-
-		try {
-			if(!nameText.getText().equals(group.getName())) {
-				group.setName(nameText.getText());
-				groupman.updateGroup(group);
-			}
-
-
-			for (int i = 0; i < model.getSize(); i++) { //iterate over all BoolWrapers in model
-				BoolWrapper<Person> w = model.get(i);
-				if(w.value && !assignedPeople.contains(w.object)) {//add people
-					groupman.addPersonToGroup(w.object, group);
-				}
-				else if(!w.value && assignedPeople.contains(w.object)) {//remove people
-					groupman.removePersonFromGroup(w.object, group);
-				}
-			}
-
-		} catch (ServiceFailureException sfex) {
-			//TODO: Exception handling
-			log.error("DataStore error", e);
-		}
-
-		this.setVisible(false);
-		this.dispose();
-
+		(new SavingWorker()).execute();
 	}
 
 	//JList click event, change bool value of particular BoolWraper and repaint to show change
@@ -302,11 +362,134 @@ public class GroupForm extends JDialog {
 			return check;
 		}
 	};
-	private JButton okButton;
-	private JTextPane nameText;
+
+	
+	/**
+	 * SwingWorker for saving content
+	 * @author Coffei
+	 */
+	private class SavingWorker extends SwingWorker<Void, Void> {
+		
+		public SavingWorker() {
+			loadText.setText(BUNDLE.getString("GroupForm.saveText"));
+			loadPanel.setVisible(true);
+			contentPanel.setVisible(false);
+			buttonPanel.setVisible(false);
+		}
+
+		@Override
+		protected void done() {
+			try {
+				get();
+			}  catch (ExecutionException e) {
+				if(e.getCause() instanceof ServiceFailureException) {
+					log.error("datastore error", e.getCause());
+					notifyOfException((Exception)e.getCause(), false);
+				} else {
+					log.error("some exception during group loading", e.getCause());
+					notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, false);
+				}
+			} catch (InterruptedException e) {
+				//shouldn't happen
+				log.error("interrupted error, should never happen!", e);
+				notifyOfException(e, false);
+			} 
+			
+			GroupForm.this.setVisible(false);
+			GroupForm.this.dispose();
+		}
+
+		@Override
+		protected Void doInBackground() throws Exception {
+			if(appCtx==null) 
+				appCtx = DBUtils.getAppContext();
+			
+			
+			GroupManager man = appCtx.getBean("groupManager", GroupManager.class);
+			if(group==null) {
+				group = new Group();
+				group.setName(nameText.getText());
+				group = man.createGroup(group);
+			} else if (!nameText.getText().equals(group.getName())) {
+				group.setName(nameText.getText());
+				man.updateGroup(group);
+			}
+			
+			ListModel<BoolWrapper<Person>> model = list.getModel();
+			for (int i = 0; i < model.getSize(); i++) { //iterate over all BoolWrapers in model
+				BoolWrapper<Person> w = model.getElementAt(i);
+				if(w.value && !assignedPeople.contains(w.object)) {//add people
+					man.addPersonToGroup(w.object, group);
+				}
+				else if(!w.value && assignedPeople.contains(w.object)) {//remove people
+					man.removePersonFromGroup(w.object, group);
+				}
+			}
+			
+			return null;
+		}
+		
+		
+	}
+	
+	
+	
+	/**
+	 * SwingWorker for loading content
+	 * @author Coffei
+	 */
+	private class LoadingWorker extends SwingWorker<ListModel<BoolWrapper<Person>>, Void> {
+		
+		public LoadingWorker() {
+			loadText.setText(BUNDLE.getString("GroupForm.loadText"));
+			loadPanel.setVisible(true);
+			contentPanel.setVisible(false);
+			buttonPanel.setVisible(false);
+			
+		}
+		
+		@Override
+		protected void done() {
+			
+			try {
+				ListModel<BoolWrapper<Person>> model = get();
+				list.setModel(model);
+			} catch (ExecutionException e) {
+				if(e.getCause() instanceof ServiceFailureException) {
+					log.error("datastore error", e.getCause());
+					notifyOfException((Exception)e.getCause(), true);
+				} else {
+					log.error("some exception during group loading", e.getCause());
+					notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, true);
+				}
+			} catch (InterruptedException e) {
+				//shouldn't happen
+				log.error("interrupted error, should not happen!", e);
+				notifyOfException(e, true);
+			} 
+			
+			
+			
+			loadPanel.setVisible(false);
+			contentPanel.setVisible(true);
+			buttonPanel.setVisible(true);
+		}
+
+		@Override
+		protected ListModel<BoolWrapper<Person>> doInBackground()
+				throws Exception {
+			
+			
+			return loadPeople();
+			
+		}
+		
+	}
+	
+	
 
 
-
+	
 	/**
 	 * Class to manage a bond between E object and boolean
 	 * @author Coffei
@@ -368,10 +551,6 @@ public class GroupForm extends JDialog {
 				return false;
 			return true;
 		}
-
-
-
-
 
 	}
 }
