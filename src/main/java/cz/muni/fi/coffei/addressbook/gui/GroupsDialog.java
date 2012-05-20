@@ -282,45 +282,7 @@ public class GroupsDialog extends JDialog {
 		(new LoadingWorker()).execute();
 	}
 
-	/**
-	 * Notifies a user of an exception
-	 * @param e exception to be notified
-	 * @param closeOnFinish whether to close the window afterwards
-	 */
-	private void notifyOfException(Exception e, final boolean closeOnFinish) {
-		final String message, title;
-
-		if(e instanceof ServiceFailureException) {
-			message = BUNDLE.getString("Exceptions.serviceFailure.message") 
-					+ (closeOnFinish? "\n" + BUNDLE.getString("Exceptions.windowWillClose") : "");
-
-			title = BUNDLE.getString("Exceptions.serviceFailure.title");
-
-		} else {
-
-			message = BUNDLE.getString("Exceptions.general.message") 
-					+ (closeOnFinish? "\n" + BUNDLE.getString("Exceptions.windowWillClose") : "");
-
-			title = BUNDLE.getString("Exceptions.general.title");
-
-		}
-
-
-		SwingUtilities.invokeLater(new Runnable() {
-
-			@Override
-			public void run() {
-				JOptionPane.showMessageDialog(GroupsDialog.this, message, title, JOptionPane.ERROR_MESSAGE);
-				if (closeOnFinish) {
-					GroupsDialog.this.setVisible(false);
-					GroupsDialog.this.dispose();
-				}
-
-			}
-		});
-	}
-
-
+	
 	/// EVENTS 
 
 	protected void listCLicked(MouseEvent e) {
@@ -417,14 +379,14 @@ public class GroupsDialog extends JDialog {
 			} catch (ExecutionException e) {
 				if(e.getCause() instanceof ServiceFailureException) {
 					log.error("datastore error", e.getCause());
-					notifyOfException((Exception)e.getCause(), true);
+					ExceptionDialogs.notifyOfException((Exception)e.getCause(), true, GroupsDialog.this);
 				} else {
 					log.error("some exception during group loading", e.getCause());
-					notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, true);
+					ExceptionDialogs.notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, true, GroupsDialog.this);
 				}
 			} catch (InterruptedException e) {
 				log.error("interrupted error, should never happen!", e);
-				notifyOfException(e, true);
+				ExceptionDialogs.notifyOfException(e, true, GroupsDialog.this);
 			} 
 
 
@@ -476,15 +438,15 @@ public class GroupsDialog extends JDialog {
 			} catch (ExecutionException e) {
 				if(e.getCause() instanceof ServiceFailureException) {
 					log.error("datastore error", e.getCause());
-					notifyOfException((Exception)e.getCause(), false);
+					ExceptionDialogs.notifyOfException((Exception)e.getCause(), false, GroupsDialog.this);
 				} else {
 					log.error("some exception during group loading", e.getCause());
-					notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, false);
+					ExceptionDialogs.notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, false, GroupsDialog.this);
 				}
 			} catch (InterruptedException e) {
 				//shouldn't happen
 				log.error("interrupted error, should never happen!", e);
-				notifyOfException(e, false);
+				ExceptionDialogs.notifyOfException(e, false, GroupsDialog.this);
 			} 
 
 
@@ -536,15 +498,15 @@ public class GroupsDialog extends JDialog {
 			} catch (ExecutionException e) {
 				if(e.getCause() instanceof ServiceFailureException) {
 					log.error("datastore error", e.getCause());
-					notifyOfException((Exception)e.getCause(), false);
+					ExceptionDialogs.notifyOfException((Exception)e.getCause(), false, GroupsDialog.this);
 				} else {
 					log.error("some exception during group loading", e.getCause());
-					notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, false);
+					ExceptionDialogs.notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, false, GroupsDialog.this);
 				}
 			} catch (InterruptedException e) {
 				//shouldn't happen
 				log.error("interrupted error, should never happen!", e);
-				notifyOfException(e, false);
+				ExceptionDialogs.notifyOfException(e, false, GroupsDialog.this);
 			} 
 
 

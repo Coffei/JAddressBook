@@ -1,39 +1,51 @@
 package cz.muni.fi.coffei.addressbook.gui;
 
+import java.awt.Component;
+import java.awt.Dialog.ModalityType;
 import java.awt.Dimension;
 import java.awt.EventQueue;
 import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowEvent;
+import java.util.Calendar;
+import java.util.Collection;
 import java.util.ResourceBundle;
+import java.util.concurrent.ExecutionException;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
-import javax.swing.ButtonGroup;
+import javax.swing.BoxLayout;
 import javax.swing.GroupLayout;
 import javax.swing.GroupLayout.Alignment;
 import javax.swing.JButton;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
-import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.LayoutStyle.ComponentPlacement;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingWorker;
 import javax.swing.UIManager;
 import javax.swing.UIManager.LookAndFeelInfo;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.border.EmptyBorder;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
-import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableModel;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import cz.muni.fi.pv168.Contact;
+import cz.muni.fi.pv168.ServiceFailureException;
 
 public class MainWindow extends JFrame {
 	/**
@@ -41,15 +53,12 @@ public class MainWindow extends JFrame {
 	 */
 	private static final long serialVersionUID = -6422025473656342443L;
 
+	private static final Logger log = LoggerFactory.getLogger(MainWindow.class);
+	
 	private static final ResourceBundle BUNDLE = ResourceBundle
-			.getBundle("cz.muni.fi.coffei.addressbook.gui.MainWindow"); //$NON-NLS-1$
+			.getBundle("cz.muni.fi.coffei.addressbook.gui.Windows"); //$NON-NLS-1
 
-	private JPanel contentPane;
-	private JTable tablePeople;
-	private JTable tableGroups;
-	private JPopupMenu rightClickMenu;
 
-	private JTabbedPane tabbedPane;
 	// Actions
 	private final Action quitAction = new AbstractAction() {
 
@@ -91,19 +100,31 @@ public class MainWindow extends JFrame {
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			// TODO Implement
-
+			
 		}
 	};
-	private final ButtonGroup buttonGroup = new ButtonGroup();
+	
+	
+	// Components
 
 	private JButton removeButton;
-
 	private JButton editBtn;
-
 	private JButton addBtn;
+	private JMenu groupsMenu;
+	private JMenuItem manageGroupsItem;
+	private JMenuItem addGroupItem;
+	private JPanel contentPane;
+	private JPanel loadPanel;
+	private JLabel loadText;
+	private JTable tablePeople;
+	private JPopupMenu rightClickMenu;
+
+	private JMenuBar menuBar;
+	
 
 	/**
 	 * Launch the application.
+	 * To run this program with splash, use java -splash:{path to image} MainWindow
 	 */
 	public static void main(String[] args) {
 
@@ -135,8 +156,9 @@ public class MainWindow extends JFrame {
 
 	/**
 	 * Create the frame.
+	 * @throws ServiceFailureException 
 	 */
-	public MainWindow() {
+	public MainWindow() throws ServiceFailureException {
 		setTitle(BUNDLE.getString("MainWindow.title")); //$NON-NLS-1$
 		setMinimumSize(new Dimension(405, 220));
 		
@@ -154,10 +176,10 @@ public class MainWindow extends JFrame {
 		removeItem.setText(BUNDLE.getString("MainWindow.remove"));
 		rightClickMenu.add(addNewItem);
 		rightClickMenu.add(editItem);
-		rightClickMenu.add(duplicateItem);
 		rightClickMenu.add(removeItem);
+		rightClickMenu.add(duplicateItem);
 
-		JMenuBar menuBar = new JMenuBar();
+		menuBar = new JMenuBar();
 		setJMenuBar(menuBar);
 
 		JMenu mnNewMenu = new JMenu(
@@ -169,20 +191,31 @@ public class MainWindow extends JFrame {
 		quitMenuItem.setText(BUNDLE.getString("MainWindow.mntmQuit.text"));
 		quitMenuItem.setMnemonic('q');
 		mnNewMenu.add(quitMenuItem);
-		contentPane = new JPanel();
-		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
-		setContentPane(contentPane);
-
-		tabbedPane = new JTabbedPane(JTabbedPane.TOP);
-		tabbedPane.addChangeListener(new ChangeListener() {
-			public void stateChanged(ChangeEvent e) {
-				tabSelectionChanged(e);
+		
+		groupsMenu = new JMenu(BUNDLE.getString("MainWindow.groupsMenuItem")); //$NON-NLS-1$
+		menuBar.add(groupsMenu);
+		
+		manageGroupsItem = new JMenuItem(BUNDLE.getString("MainWindow.manageGroups")); //$NON-NLS-1$
+		manageGroupsItem.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				manageGroupsAction(e);
 			}
 		});
-		tabbedPane.setAlignmentX(0.0f);
-		tabbedPane.setAlignmentY(0.0f);
-		tabbedPane.setBorder(null);
+		groupsMenu.add(manageGroupsItem);
+		
+		addGroupItem = new JMenuItem(BUNDLE.getString("MainWindow.addNewGroup")); //$NON-NLS-1$
+		addGroupItem.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				addGroupPerformed(e);
+			}
+		});
+		groupsMenu.add(addGroupItem);
+		contentPane = new JPanel();
+		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
+		
 
+		JScrollPane scrollPane = new JScrollPane();
+		
 		removeButton = new JButton(removeAction);
 		removeButton.setEnabled(false);
 		removeButton.setText(BUNDLE.getString("MainWindow.removePeople"));
@@ -201,7 +234,7 @@ public class MainWindow extends JFrame {
 						.addGroup(
 								gl_contentPane
 										.createSequentialGroup()
-										.addComponent(tabbedPane,
+										.addComponent(scrollPane,
 												GroupLayout.DEFAULT_SIZE, 706,
 												Short.MAX_VALUE).addGap(0))
 						.addGroup(
@@ -214,7 +247,7 @@ public class MainWindow extends JFrame {
 				Alignment.LEADING).addGroup(
 				gl_contentPane
 						.createSequentialGroup()
-						.addComponent(tabbedPane, GroupLayout.DEFAULT_SIZE,
+						.addComponent(scrollPane, GroupLayout.DEFAULT_SIZE,
 								400, Short.MAX_VALUE)
 						.addPreferredGap(ComponentPlacement.RELATED,
 								GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
@@ -231,52 +264,21 @@ public class MainWindow extends JFrame {
 												GroupLayout.PREFERRED_SIZE, 29,
 												GroupLayout.PREFERRED_SIZE))
 						.addGap(5)));
-
-		JPanel panel = new JPanel();
-		panel.setAlignmentY(0.0f);
-		panel.setAutoscrolls(true);
-		panel.setAlignmentX(0.0f);
-		tabbedPane.addTab(BUNDLE.getString("MainWindow.tabPeople.text"), null,
-				panel, null);
-
-		JScrollPane scrollPane = new JScrollPane();
+		
 		scrollPane.setBorder(null);
-		GroupLayout gl_panel = new GroupLayout(panel);
-		gl_panel.setHorizontalGroup(gl_panel.createParallelGroup(
-				Alignment.TRAILING).addGroup(
-				gl_panel.createSequentialGroup()
-						.addGap(0)
-						.addComponent(scrollPane, GroupLayout.DEFAULT_SIZE,
-								706, Short.MAX_VALUE).addGap(0)));
-		gl_panel.setVerticalGroup(gl_panel.createParallelGroup(
-				Alignment.LEADING).addGroup(
-				gl_panel.createSequentialGroup()
-						.addGap(0)
-						.addComponent(scrollPane, GroupLayout.DEFAULT_SIZE,
-								370, Short.MAX_VALUE)));
-
 		tablePeople = new JTable();
+		tablePeople.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		tablePeople.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
 				tablePeopleMouseClicked(e);
 			}
 		});
-		tablePeople.setModel(new DefaultTableModel(new Object[][] {
-				{ null, null, null, null, null, null },
-				{ null, null, null, null, null, null },
-				{ null, null, null, null, null, null },
-				{ null, null, null, null, null, null },
-				{ null, null, null, null, null, null },
-				{ null, null, null, null, null, null },
-				{ null, null, null, null, null, null },
-				{ null, null, null, null, null, null },
-				{ null, null, null, null, null, null },
-				{ null, null, null, null, null, null },
-				{ null, null, null, null, null, null },
-				{ null, null, null, null, null, null }, }, new String[] {
-				"Name", "Phone", "Address", "Email", "Other...", "Birthday" }));
-		panel.setLayout(gl_panel);
+		
+		
+		tablePeople.setDefaultRenderer(Contact.class, new ContactCellRenderer());
+		tablePeople.setDefaultRenderer(Collection.class, new CollectionContactCellRenderer());
+		tablePeople.setDefaultRenderer(Calendar.class, new CalendarCellRenderer());
 		tablePeople.getSelectionModel().addListSelectionListener(
 				new ListSelectionListener() {
 					@Override
@@ -285,65 +287,65 @@ public class MainWindow extends JFrame {
 					}
 				});
 		scrollPane.setViewportView(tablePeople);
-		
-		JPanel panel_1 = new JPanel();
-		tabbedPane.addTab(BUNDLE.getString("MainWindow.tabGroups.text"), null,
-				panel_1, null);
-
-		JScrollPane scrollPane_1 = new JScrollPane();
-		scrollPane_1.setBorder(null);
-		GroupLayout gl_panel_1 = new GroupLayout(panel_1);
-		gl_panel_1.setHorizontalGroup(gl_panel_1.createParallelGroup(
-				Alignment.LEADING).addGroup(
-				gl_panel_1
-						.createSequentialGroup()
-						.addComponent(scrollPane_1, GroupLayout.DEFAULT_SIZE,
-								getBounds().width, Short.MAX_VALUE)));
-		gl_panel_1.setVerticalGroup(gl_panel_1.createParallelGroup(
-				Alignment.LEADING).addGroup(
-				gl_panel_1
-						.createSequentialGroup()
-						.addComponent(scrollPane_1, GroupLayout.DEFAULT_SIZE,
-								430, Short.MAX_VALUE)));
-
-		tableGroups = new JTable();
-		tableGroups.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseClicked(MouseEvent e) {
-				tableGroupMouseClicked(e);
-			}
-		});
-		tableGroups.getSelectionModel().addListSelectionListener(
-				new ListSelectionListener() {
-					@Override
-					public void valueChanged(ListSelectionEvent e) {
-						tableGroupsSelectionChanged(e);
-					}
-				});
-		tableGroups.setModel(new DefaultTableModel(new Object[][] {
-				{ null, null }, { null, null }, { null, null }, { null, null },
-				{ null, null }, { null, null }, { null, null }, { null, null },
-				{ null, null }, { null, null }, { null, null }, { null, null },
-				{ null, null }, }, new String[] { "Name", "People" }));
-		tableGroups.getColumnModel().getColumn(1).setPreferredWidth(551);
-		scrollPane_1.setViewportView(tableGroups);
-		panel_1.setLayout(gl_panel_1);
 		contentPane.setLayout(gl_contentPane);
-
-	}
-
-	protected void tabSelectionChanged(ChangeEvent e) {
-		// TODO:change labels
-		if (((JTabbedPane) e.getSource()).getSelectedIndex() == 0) {
-			// people tab selected
-
-		} else {
-			// group tab selected
+		
+		loadPanel = new JPanel();
+		loadPanel.setLayout(new BoxLayout(loadPanel, BoxLayout.Y_AXIS));
+		{
+			loadText = new JLabel(BUNDLE.getString("MainWindow.mainLoadText"));
+			loadText.setBorder(new EmptyBorder(100, 0, 10, 0));
+			loadText.setAlignmentX(Component.CENTER_ALIGNMENT);
+			loadPanel.add(loadText);
 		}
+		{
+			JProgressBar loadProgress = new JProgressBar();
+			loadProgress.setIndeterminate(true);
+			loadPanel.add(loadProgress);
+		}
+		
+		
+		initialize(true);
+
+	}
+	
+	/**
+	 * Loads content into the frame
+	 * To run this program with splash, use java -splash:{path to image} MainWindow
+	 * @param longLasting whether it can block the calling thread- use with splash only
+	 */
+	
+	private void initialize(boolean longLasting) {
+		if(longLasting) {
+			try {
+				tablePeople.setModel(new PersonTableModel());
+				setContentPane(contentPane);
+			} catch (ServiceFailureException e) {
+				log.error("data store exception", e);
+				ExceptionDialogs.notifyOfException(e, true, this);
+			}
+		} else {
+			(new LoadingWorker()).execute();
+		}
+		
 	}
 
-	protected void tableGroupsSelectionChanged(ListSelectionEvent e) {
-		if (!e.getValueIsAdjusting() && tabbedPane.getSelectedIndex() == 1) {
+	
+
+	protected void addGroupPerformed(ActionEvent e) {
+		GroupForm form = new GroupForm(null, this);
+		form.setModalityType(ModalityType.APPLICATION_MODAL);
+		form.setVisible(true);
+	}
+
+	protected void manageGroupsAction(ActionEvent e) {
+		GroupsDialog groupsDialog = new GroupsDialog(this);
+		groupsDialog.setModalityType(ModalityType.APPLICATION_MODAL);
+		groupsDialog.setVisible(true);
+		
+	}
+
+	protected void tablePeopleSelectionChanged(ListSelectionEvent e) {
+		if (!e.getValueIsAdjusting()) {
 			if (((ListSelectionModel) e.getSource()).isSelectionEmpty()) {
 				removeButton.setEnabled(false);
 				editBtn.setEnabled(false);
@@ -354,32 +356,52 @@ public class MainWindow extends JFrame {
 		}
 	}
 
-	protected void tablePeopleSelectionChanged(ListSelectionEvent e) {
-		if (!e.getValueIsAdjusting() && tabbedPane.getSelectedIndex() == 0) {
-			if (((ListSelectionModel) e.getSource()).isSelectionEmpty()) {
-				removeButton.setEnabled(false);
-				editBtn.setEnabled(false);
-			}
-
-			else {
-				removeButton.setEnabled(true);
-				editBtn.setEnabled(true);
-			}
-		}
-	}
-
-	protected void tableGroupMouseClicked(MouseEvent e) {
-		if (e.getButton() == MouseEvent.BUTTON3
-				&& tableGroups.getSelectedRow() >= 0) {
-			rightClickMenu.show(tableGroups, e.getX(), e.getY());
-		}
-	}
-
+	
 	protected void tablePeopleMouseClicked(MouseEvent e) {
 		if (e.getButton() == MouseEvent.BUTTON3
 				&& tablePeople.getSelectedRow() >= 0) {
 			rightClickMenu.show(tablePeople, e.getX(), e.getY());
 		}
 
+	}
+	
+	
+	
+	private class LoadingWorker extends SwingWorker<TableModel, Void> {
+		
+		
+		public LoadingWorker() {
+			MainWindow.this.setContentPane(loadPanel);
+			menuBar.setVisible(false);
+		}
+		
+		@Override
+		protected void done() {
+			try {
+				TableModel model = get();
+				tablePeople.setModel(model);
+			} catch (ExecutionException e) {
+				if(e.getCause() instanceof ServiceFailureException) {
+					log.error("datastore error", e.getCause());
+					ExceptionDialogs.notifyOfException((Exception)e.getCause(), true, MainWindow.this);
+				} else {
+					log.error("some exception during group loading", e.getCause());
+					ExceptionDialogs.notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, true, MainWindow.this);
+				}
+			} catch (InterruptedException e) {
+				log.error("LoadingWorker interrupted",e);
+				ExceptionDialogs.notifyOfException(e, true, MainWindow.this);
+			} 
+			
+			menuBar.setVisible(true);
+			MainWindow.this.setContentPane(contentPane);
+			MainWindow.this.pack();
+		}
+
+		@Override
+		protected TableModel doInBackground() throws Exception {
+			return new PersonTableModel();
+		}
+		
 	}
 }

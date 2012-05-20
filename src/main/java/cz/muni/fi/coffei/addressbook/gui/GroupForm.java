@@ -166,7 +166,7 @@ public class GroupForm extends JDialog {
 
 		list = new JList<BoolWrapper<Person>>();
 		list.setLayoutOrientation(JList.VERTICAL_WRAP);
-		list.setBackground(UIManager.getColor("List.background"));
+		//list.setBackground(UIManager.getColor("List.background"));
 		list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		list.setCellRenderer(CHECKBOX_LIST_RENDERER);
 		list.addMouseListener(new MouseAdapter() {
@@ -190,6 +190,7 @@ public class GroupForm extends JDialog {
 
 
 			nameText = new JTextField();
+			nameText.setBorder(new EmptyBorder(0, 5, 0, 0));
 			nameText.setPreferredSize(new Dimension(12, 12));
 			nameText.setInputVerifier(new InputVerifier() {
 				public boolean verify(JComponent input) { //put all verification-dependent code here
@@ -254,44 +255,7 @@ public class GroupForm extends JDialog {
 		(new LoadingWorker()).execute();
 	}
 	
-	/**
-	 * Notifies a user of an exception
-	 * @param e exception to be notified
-	 * @param closeOnFinish whether to close the window afterwards
-	 */
-	private void notifyOfException(Exception e, final boolean closeOnFinish) {
-		final String message, title;
-
-		if(e instanceof ServiceFailureException) {
-			message = BUNDLE.getString("Exceptions.serviceFailure.message") 
-					+ (closeOnFinish? "\n" + BUNDLE.getString("Exceptions.windowWillClose") : "");
-
-			title = BUNDLE.getString("Exceptions.serviceFailure.title");
-
-		} else {
-
-			message = BUNDLE.getString("Exceptions.general.message") 
-					+ (closeOnFinish? "\n" + BUNDLE.getString("Exceptions.windowWillClose") : "");
-
-			title = BUNDLE.getString("Exceptions.general.title");
-
-		}
-
-
-		SwingUtilities.invokeLater(new Runnable() {
-
-			@Override
-			public void run() {
-				JOptionPane.showMessageDialog(GroupForm.this, message, title, JOptionPane.ERROR_MESSAGE);
-				if (closeOnFinish) {
-					GroupForm.this.setVisible(false);
-					GroupForm.this.dispose();
-				}
-
-			}
-		});
-	}
-
+	
 	/**
 	 * Loads people from data source and creates according ListModel.
 	 * @param group group to edit, null if creating new
@@ -384,15 +348,15 @@ public class GroupForm extends JDialog {
 			}  catch (ExecutionException e) {
 				if(e.getCause() instanceof ServiceFailureException) {
 					log.error("datastore error", e.getCause());
-					notifyOfException((Exception)e.getCause(), false);
+					 ExceptionDialogs.notifyOfException((Exception)e.getCause(), false, GroupForm.this);
 				} else {
 					log.error("some exception during group loading", e.getCause());
-					notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, false);
+					ExceptionDialogs.notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, false, GroupForm.this);
 				}
 			} catch (InterruptedException e) {
 				//shouldn't happen
 				log.error("interrupted error, should never happen!", e);
-				notifyOfException(e, false);
+				ExceptionDialogs.notifyOfException(e, false, GroupForm.this);
 			} 
 			
 			GroupForm.this.setVisible(false);
@@ -457,15 +421,15 @@ public class GroupForm extends JDialog {
 			} catch (ExecutionException e) {
 				if(e.getCause() instanceof ServiceFailureException) {
 					log.error("datastore error", e.getCause());
-					notifyOfException((Exception)e.getCause(), true);
+					ExceptionDialogs.notifyOfException((Exception)e.getCause(), true, GroupForm.this);
 				} else {
 					log.error("some exception during group loading", e.getCause());
-					notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, true);
+					ExceptionDialogs.notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, true, GroupForm.this);
 				}
 			} catch (InterruptedException e) {
 				//shouldn't happen
 				log.error("interrupted error, should not happen!", e);
-				notifyOfException(e, true);
+				ExceptionDialogs.notifyOfException(e, true, GroupForm.this);
 			} 
 			
 			
@@ -473,6 +437,7 @@ public class GroupForm extends JDialog {
 			loadPanel.setVisible(false);
 			contentPanel.setVisible(true);
 			buttonPanel.setVisible(true);
+			nameText.grabFocus();
 		}
 
 		@Override
