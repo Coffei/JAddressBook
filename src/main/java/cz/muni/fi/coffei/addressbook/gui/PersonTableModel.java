@@ -50,7 +50,7 @@ public class PersonTableModel extends AbstractTableModel {
 		List<Person> allpeople = personMan.findAllPersons();
 		for(Person p : allpeople) {
 			PersonContainer pc = new PersonContainer(p);
-			List<Contact> contacts = contactMan.findContactsByPerson(p);
+			List<Contact> contacts = new ArrayList();//contactMan.findContactsByPerson(p);
 			for(Contact c : contacts) {
 				pc.addContact(c);
 			}

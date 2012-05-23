@@ -4,11 +4,18 @@
  */
 package cz.muni.fi.coffei.addressbook.gui;
 
-import java.util.ResourceBundle;
+import cz.muni.fi.pv168.*;
+import java.awt.Component;
+import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.logging.Level;
+import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
 
 /**
  *
@@ -16,15 +23,27 @@ import org.slf4j.LoggerFactory;
  */
 public class PersonForm extends javax.swing.JDialog {
 
-    private static final ResourceBundle BUNDLE = ResourceBundle.getBundle("cz.muni.fi.coffei.addressbook.gui.Windows"); //$NON-NLS-1$
     private static final Logger log = LoggerFactory.getLogger(GroupForm.class);
+    private ApplicationContext appCtx = null;
+    private Person person = null;
+    private List<Contact> assignedContacts = Collections.EMPTY_LIST;
 
     /**
      * Creates new form PersonForm
      */
-    public PersonForm(java.awt.Frame parent, boolean modal) {
-        super(parent, modal);
+    public PersonForm(java.awt.Frame parent, Person person) {
+        super(parent);
+
+        Person person1 = new Person();
+        person1.setId(new Long(215));
+        person1.setName("Martin");
+        person1.setBorn(Calendar.getInstance());
+        //this.person = person1;
+
         initComponents();
+
+        new LoadingWorker().execute();
+        new GroupsLoadingWorker().execute();
     }
 
     /**
@@ -36,146 +55,197 @@ public class PersonForm extends javax.swing.JDialog {
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
-        buttonGroup1 = new javax.swing.ButtonGroup();
-        submit = new javax.swing.JButton();
-        cancel = new javax.swing.JButton();
-        jPanel1 = new javax.swing.JPanel();
-        name = new javax.swing.JLabel();
-        namefield = new javax.swing.JTextField();
-        bornDayComboBox = new javax.swing.JComboBox();
-        born = new javax.swing.JLabel();
-        bornMonthComboBox = new javax.swing.JComboBox();
-        bornYearComboBox = new javax.swing.JComboBox();
-        jPanel2 = new javax.swing.JPanel();
+        basicsPanel = new javax.swing.JPanel();
+        nameLabel = new javax.swing.JLabel();
+        nameText = new javax.swing.JTextField();
+        bornLabel = new javax.swing.JLabel();
+        jComboBox1 = new javax.swing.JComboBox();
+        jComboBox2 = new javax.swing.JComboBox();
+        jComboBox3 = new javax.swing.JComboBox();
+        contactsPanel = new javax.swing.JPanel();
+        jScrollPane2 = new javax.swing.JScrollPane();
+        contactsTable = new javax.swing.JTable();
+        groupsPanel = new javax.swing.JPanel();
         jScrollPane1 = new javax.swing.JScrollPane();
-        jList1 = new javax.swing.JList();
+        groupList = new javax.swing.JList();
+        submitButton = new javax.swing.JButton();
+        cancelButton = new javax.swing.JButton();
+        addContactButton = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         java.util.ResourceBundle bundle = java.util.ResourceBundle.getBundle("cz/muni/fi/coffei/addressbook/gui/Windows"); // NOI18N
-        setTitle(bundle.getString("PersonFrom.title")); // NOI18N
+        setTitle(bundle.getString("PersonForm.title")); // NOI18N
 
-        submit.setText(bundle.getString("PersonForm.submin")); // NOI18N
+        basicsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(null, bundle.getString("PersonForm.basic"), javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Aharoni CLM", 1, 12))); // NOI18N
 
-        cancel.setText(bundle.getString("PersonForm.cancel")); // NOI18N
-        cancel.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                cancelMouseClicked(evt);
+        nameLabel.setText(bundle.getString("PersonForm.nameLabel")); // NOI18N
+
+        if(person != null){
+            nameText.setText(person.getName());
+        } else {
+            nameText.setText("");
+        }
+
+        bornLabel.setText(bundle.getString("PersonForm.bornLabel")); // NOI18N
+
+        jComboBox1.setModel(bornDays());
+        if(person != null){
+            jComboBox1.setSelectedItem(person.getBorn().get(Calendar.DAY_OF_MONTH));
+        }
+
+        jComboBox2.setModel(bornMonths());
+        if(person != null){
+            jComboBox2.setSelectedItem(person.getBorn().get(Calendar.MONTH));
+        }
+
+        jComboBox3.setModel(bornYears());
+        if(person != null){
+            jComboBox3.setSelectedItem(person.getBorn().get(Calendar.YEAR));
+
+        }
+
+        javax.swing.GroupLayout basicsPanelLayout = new javax.swing.GroupLayout(basicsPanel);
+        basicsPanel.setLayout(basicsPanelLayout);
+        basicsPanelLayout.setHorizontalGroup(
+            basicsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(basicsPanelLayout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(basicsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(basicsPanelLayout.createSequentialGroup()
+                        .addComponent(nameLabel)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(nameText))
+                    .addGroup(basicsPanelLayout.createSequentialGroup()
+                        .addComponent(bornLabel)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jComboBox2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jComboBox3, 0, 240, Short.MAX_VALUE)))
+                .addContainerGap())
+        );
+        basicsPanelLayout.setVerticalGroup(
+            basicsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(basicsPanelLayout.createSequentialGroup()
+                .addGroup(basicsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(nameLabel)
+                    .addComponent(nameText, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(basicsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(bornLabel)
+                    .addComponent(jComboBox1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jComboBox2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jComboBox3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
+        );
+
+        contactsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(null, bundle.getString("PersonForm.contacts"), javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Aharoni CLM", 1, 12))); // NOI18N
+
+        contactsTable.setTableHeader(null);
+        jScrollPane2.setViewportView(contactsTable);
+
+        javax.swing.GroupLayout contactsPanelLayout = new javax.swing.GroupLayout(contactsPanel);
+        contactsPanel.setLayout(contactsPanelLayout);
+        contactsPanelLayout.setHorizontalGroup(
+            contactsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
+        );
+        contactsPanelLayout.setVerticalGroup(
+            contactsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 163, javax.swing.GroupLayout.PREFERRED_SIZE)
+        );
+
+        groupsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(null, bundle.getString("PersonForm.inGroup"), javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Aharoni CLM", 1, 12))); // NOI18N
+
+        jScrollPane1.setViewportView(groupList);
+
+        javax.swing.GroupLayout groupsPanelLayout = new javax.swing.GroupLayout(groupsPanel);
+        groupsPanel.setLayout(groupsPanelLayout);
+        groupsPanelLayout.setHorizontalGroup(
+            groupsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(jScrollPane1)
+        );
+        groupsPanelLayout.setVerticalGroup(
+            groupsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, groupsPanelLayout.createSequentialGroup()
+                .addGap(0, 0, Short.MAX_VALUE)
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 124, javax.swing.GroupLayout.PREFERRED_SIZE))
+        );
+
+        submitButton.setText(bundle.getString("PersonForm.submit")); // NOI18N
+        submitButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                submitButtonActionPerformed(evt);
             }
         });
 
-        jPanel1.setBorder(javax.swing.BorderFactory.createTitledBorder(null, bundle.getString("PersonForm.basic"), javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Aharoni CLM", 1, 12))); // NOI18N
-        jPanel1.setName("panel");
-
-        name.setText("name");
-
-        namefield.setText("jTextField1");
-
-        bornDayComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-
-        born.setText("born");
-
-        bornMonthComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-
-        bornYearComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-
-        javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
-        jPanel1.setLayout(jPanel1Layout);
-        jPanel1Layout.setHorizontalGroup(
-            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel1Layout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addComponent(name)
-                        .addGap(29, 29, 29)
-                        .addComponent(namefield, javax.swing.GroupLayout.PREFERRED_SIZE, 288, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addComponent(born)
-                        .addGap(33, 33, 33)
-                        .addComponent(bornDayComboBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(bornMonthComboBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(bornYearComboBox, javax.swing.GroupLayout.PREFERRED_SIZE, 132, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addContainerGap(18, Short.MAX_VALUE))
-        );
-        jPanel1Layout.setVerticalGroup(
-            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel1Layout.createSequentialGroup()
-                .addContainerGap()
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(name)
-                    .addComponent(namefield, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(born)
-                    .addComponent(bornDayComboBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(bornMonthComboBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(bornYearComboBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-        );
-
-        jPanel2.setBorder(javax.swing.BorderFactory.createTitledBorder(null, bundle.getString("PersonFrom.contacts"), javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Aharoni CLM", 1, 12))); // NOI18N
-
-        jList1.setModel(new javax.swing.AbstractListModel() {
-            String[] strings = { "Item 1", "Item 2", "Item 3", "Item 4", "Item 5" };
-            public int getSize() { return strings.length; }
-            public Object getElementAt(int i) { return strings[i]; }
+        cancelButton.setText(bundle.getString("PersonForm.cancel")); // NOI18N
+        cancelButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                cancelButtonActionPerformed(evt);
+            }
         });
-        jScrollPane1.setViewportView(jList1);
 
-        javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
-        jPanel2.setLayout(jPanel2Layout);
-        jPanel2Layout.setHorizontalGroup(
-            jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel2Layout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(jScrollPane1)
-                .addContainerGap())
-        );
-        jPanel2Layout.setVerticalGroup(
-            jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel2Layout.createSequentialGroup()
-                .addGap(0, 0, Short.MAX_VALUE)
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-        );
+        addContactButton.setText(bundle.getString("PersonForm.addContactButton")); // NOI18N
+        addContactButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                addContactButtonActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+            .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addComponent(jPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(groupsPanel, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(contactsPanel, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(basicsPanel, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addGroup(layout.createSequentialGroup()
-                        .addComponent(submit)
+                        .addComponent(submitButton)
+                        .addGap(108, 108, 108)
+                        .addComponent(addContactButton)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(cancel))
-                    .addComponent(jPanel1, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                        .addComponent(cancelButton)))
                 .addContainerGap())
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addGap(10, 10, 10)
-                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap()
+                .addComponent(basicsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(contactsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(groupsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(submit)
-                    .addComponent(cancel))
+                    .addComponent(submitButton)
+                    .addComponent(cancelButton)
+                    .addComponent(addContactButton))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-    private void cancelMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_cancelMouseClicked
+    private void cancelButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cancelButtonActionPerformed
         this.setVisible(false);
         this.dispose();
-    }//GEN-LAST:event_cancelMouseClicked
+        System.exit(0);
+    }//GEN-LAST:event_cancelButtonActionPerformed
+
+    private void submitButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_submitButtonActionPerformed
+        new SavingWorker().execute();
+        this.setVisible(false);
+        this.dispose();
+    }//GEN-LAST:event_submitButtonActionPerformed
+
+    private void addContactButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addContactButtonActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_addContactButtonActionPerformed
 
     /**
      * @param args the command line arguments
@@ -214,7 +284,7 @@ public class PersonForm extends javax.swing.JDialog {
         java.awt.EventQueue.invokeLater(new Runnable() {
 
             public void run() {
-                PersonForm dialog = new PersonForm(new javax.swing.JFrame(), true);
+                PersonForm dialog = new PersonForm(new javax.swing.JFrame(), null);
                 dialog.addWindowListener(new java.awt.event.WindowAdapter() {
 
                     @Override
@@ -226,12 +296,63 @@ public class PersonForm extends javax.swing.JDialog {
             }
         });
     }
+    // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JButton addContactButton;
+    private javax.swing.JPanel basicsPanel;
+    private javax.swing.JLabel bornLabel;
+    private javax.swing.JButton cancelButton;
+    private javax.swing.JPanel contactsPanel;
+    private javax.swing.JTable contactsTable;
+    private javax.swing.JList groupList;
+    private javax.swing.JPanel groupsPanel;
+    private javax.swing.JComboBox jComboBox1;
+    private javax.swing.JComboBox jComboBox2;
+    private javax.swing.JComboBox jComboBox3;
+    private javax.swing.JScrollPane jScrollPane1;
+    private javax.swing.JScrollPane jScrollPane2;
+    private javax.swing.JLabel nameLabel;
+    private javax.swing.JTextField nameText;
+    private javax.swing.JButton submitButton;
+    // End of variables declaration//GEN-END:variables
 
     private class ContactsTableModel extends AbstractTableModel {
 
+        private ApplicationContext appCtx = DBUtils.getAppContext();
+        private ContactManager contactManager = null;
+        private PersonManager personManager = null;
+        private List<Contact> list = null;
+        private Person person = null;
+
+        public ContactsTableModel(Person person) throws ServiceFailureException {
+            contactManager = appCtx.getBean("contactManager", ContactManager.class);
+            personManager = appCtx.getBean("personManager", PersonManager.class);
+
+            if (person == null) {
+                list = new ArrayList<>();
+                Contact email = new Contact();
+                email.setType("email");
+                list.add(email);
+
+                Contact mobile = new Contact();
+                mobile.setType("mobile");
+                list.add(mobile);
+
+                Contact address = new Contact();
+                address.setType("address");
+                list.add(address);
+
+                Contact nick = new Contact();
+                nick.setType("nick");
+                list.add(nick);
+
+            } else {
+                list = contactManager.findContactsByPerson(person);
+            }
+        }
+
         @Override
         public int getRowCount() {
-            return 2;
+            return list.size();
         }
 
         @Override
@@ -241,29 +362,265 @@ public class PersonForm extends javax.swing.JDialog {
 
         @Override
         public Object getValueAt(int rowIndex, int columnIndex) {
+            Contact contact = list.get(rowIndex);
             switch (columnIndex) {
                 case 0:
-                    return "hop";
+                    return contact.getType() + ": ";
                 case 1:
-                    return "skok";
+                    return contact.getValue();
                 default:
-                    throw new IllegalArgumentException("coumnIndex");
+                    throw new IllegalArgumentException("ColumnIndex");
+            }
+        }
+
+        public void addContact(Contact contact) {
+            list.add(contact);
+            int lastRow = list.size() - 1;
+            fireTableRowsInserted(lastRow, lastRow);
+        }
+
+        public Contact getContactFromRow(int row) {
+            return list.get(row);
+        }
+
+        public int getSize() {
+            return list.size();
+        }
+    }
+
+    private DefaultComboBoxModel<Integer> bornDays() {
+        Integer[] bornDays = new Integer[31];
+        for (int i = 0; i < 31; i++) {
+            bornDays[i] = i + 1;
+        }
+
+        return new DefaultComboBoxModel(bornDays);
+    }
+
+    private DefaultComboBoxModel<Integer> bornMonths() {
+        Integer bornMonths[] = new Integer[12];
+        for (int i = 0; i < 12; i++) {
+            bornMonths[i] = i + 1;
+        }
+        return new DefaultComboBoxModel<Integer>(bornMonths);
+    }
+
+    private DefaultComboBoxModel<Integer> bornYears() {
+        Calendar cal = Calendar.getInstance();
+        Integer bornYears[] = new Integer[cal.get(Calendar.YEAR) - 1920];
+        for (int i = 0; i < (cal.get(Calendar.YEAR) - 1920); i++) {
+            bornYears[i] = 1920 + i + 1;
+        }
+
+        return new DefaultComboBoxModel(bornYears);
+    }
+    private ListCellRenderer<BoolWrapper<Group>> listCellRenderer = new ListCellRenderer<BoolWrapper<Group>>() {
+
+        @Override
+        public Component getListCellRendererComponent(JList<? extends BoolWrapper<Group>> list, BoolWrapper<Group> value, int index, boolean isSelected, boolean cellHasFocus) {
+            JCheckBox check = new JCheckBox();
+            if (value != null) {
+                check.setText(value.getObject().getName());
+                check.setSelected(value.getValue());
+            }
+
+            return check;
+        }
+    };
+
+    private class GroupsLoadingWorker extends SwingWorker<ListModel<BoolWrapper<Group>>, Void> {
+
+        @Override
+        protected ListModel<BoolWrapper<Group>> doInBackground() throws Exception {
+            if (appCtx == null) {
+                appCtx = DBUtils.getAppContext();
+            }
+
+            GroupManager groupman = appCtx.getBean("groupManager", GroupManager.class);
+            PersonManager personman = DBUtils.getAppContext().getBean("personManager", PersonManager.class);
+            DefaultListModel<BoolWrapper<Group>> model = new DefaultListModel<>();
+
+            if (person != null) {
+                List<Group> assignedGroups = groupman.findGroupsByPerson(person);
+
+                for (Group group : assignedGroups) {
+                    model.addElement(new BoolWrapper<Group>(group, true));
+                }
+                List<Group> allGroups = groupman.findAllGroups();
+                allGroups.removeAll(assignedGroups);
+
+                for (Group group : allGroups) {
+                    model.addElement(new BoolWrapper<Group>(group));
+                }
+
+                List groups = groupman.findAllGroups();
+
+
+            } else {
+                List<Group> groups = groupman.findAllGroups();
+                for (Group group : groups) {
+                    model.addElement(new BoolWrapper<Group>(group));
+                }
+            }
+
+            return model;
+        }
+
+        protected void done() {
+            try {
+                ListModel<BoolWrapper<Group>> model = get();
+                groupList.setModel(model);
+                groupList.setCellRenderer(listCellRenderer);
+            } catch (InterruptedException ex) {
+                log.error("interrupted", ex.getCause());
+                ExceptionDialogs.notifyOfException((Exception) ex.getCause(), true, PersonForm.this);
+            } catch (ExecutionException ex) {
+                log.error("datastore error", ex.getCause());
+                ExceptionDialogs.notifyOfException((Exception) ex.getCause(), true, PersonForm.this);
             }
         }
     }
-    // Variables declaration - do not modify//GEN-BEGIN:variables
-    private javax.swing.JLabel born;
-    private javax.swing.JComboBox bornDayComboBox;
-    private javax.swing.JComboBox bornMonthComboBox;
-    private javax.swing.JComboBox bornYearComboBox;
-    private javax.swing.ButtonGroup buttonGroup1;
-    private javax.swing.JButton cancel;
-    private javax.swing.JList jList1;
-    private javax.swing.JPanel jPanel1;
-    private javax.swing.JPanel jPanel2;
-    private javax.swing.JScrollPane jScrollPane1;
-    private javax.swing.JLabel name;
-    private javax.swing.JTextField namefield;
-    private javax.swing.JButton submit;
-    // End of variables declaration//GEN-END:variables
+
+    private class LoadingWorker extends SwingWorker<ContactsTableModel, Void> {
+
+        @Override
+        protected void done() {
+
+            ContactsTableModel model;
+            try {
+                model = get();
+                contactsTable.setModel(model);
+
+            } catch (InterruptedException ex) {
+                log.error("Datasource error", ex);
+                ExceptionDialogs.notifyOfException((Exception) ex.getCause(), true, PersonForm.this);
+            } catch (ExecutionException ex) {
+                log.error("Interupt error", ex);
+                ExceptionDialogs.notifyOfException((Exception) ex.getCause(), true, PersonForm.this);
+            }
+        }
+
+        @Override
+        protected ContactsTableModel doInBackground() throws Exception {
+            return new ContactsTableModel(person);
+        }
+    }
+
+    private class SavingWorker extends SwingWorker<Void, Void> {
+
+        @Override
+        protected Void doInBackground() throws Exception {
+            if (appCtx == null) {
+                appCtx = DBUtils.getAppContext();
+            }
+            PersonManager pman = appCtx.getBean("personManager", PersonManager.class);
+            ContactManager cman = appCtx.getBean("contactManager", ContactManager.class);
+
+            if (person == null) {
+                Person person = new Person();
+                person.setName(nameText.getText());
+
+                Calendar cal = Calendar.getInstance();
+                cal.set((Integer) jComboBox3.getSelectedItem(), (Integer) jComboBox2.getSelectedItem() - 1, (Integer) jComboBox1.getSelectedItem());
+                person.setBorn(cal);
+
+                pman.createPerson(person);
+
+                ContactsTableModel model = (ContactsTableModel) contactsTable.getModel();
+                for (int i = 0; i < model.getSize(); i++) {
+                    Contact contact = model.getContactFromRow(i);
+                    cman.createContact(contact, person);
+                }
+
+
+            } else {
+                person.setName(nameText.getText());
+                Calendar cal = Calendar.getInstance();
+                cal.set((Integer) jComboBox3.getSelectedItem(), (Integer) jComboBox2.getSelectedItem(), (Integer) jComboBox1.getSelectedItem());
+                person.setBorn(cal);
+
+                pman.updatePerson(person);
+
+                ContactsTableModel model = (ContactsTableModel) contactsTable.getModel();
+                for (int i = 0; i < model.getSize(); i++) {
+                    Contact contact = model.getContactFromRow(i);
+                    if (contact.getId() == null) {
+                        cman.createContact(contact, person);
+                    } else {
+                        cman.updateContact(contact);
+                    }
+                }
+            }
+
+            return null;
+        }
+    }
+
+    private class BoolWrapper<E> {
+
+        private E object;
+        private boolean value;
+
+        /**
+         * Constructor
+         *
+         * @param object object to be bonded, can not be null
+         * @param value value to bond
+         */
+        public BoolWrapper(E object, boolean value) {
+            if (object == null) {
+                throw new NullPointerException("object");
+            }
+            this.object = object;
+            this.value = value;
+        }
+
+        /**
+         * Constructor
+         *
+         * @param object object to be bonded with false
+         */
+        public BoolWrapper(E object) {
+            this(object, false);
+        }
+
+        public E getObject() {
+            return object;
+        }
+
+        public boolean getValue() {
+            return value;
+        }
+
+        public void setValue(boolean value) {
+            this.value = value;
+        }
+
+        @Override
+        public int hashCode() {
+            return object.hashCode() * 31;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            BoolWrapper<?> other = (BoolWrapper<?>) obj;
+            if (object == null) {
+                if (other.object != null) {
+                    return false;
+                }
+            } else if (!object.equals(other.object)) {
+                return false;
+            }
+            return true;
+        }
+    }
 }
