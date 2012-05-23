@@ -9,14 +9,17 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowEvent;
+import java.text.Collator;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.ResourceBundle;
 import java.util.concurrent.ExecutionException;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.BoxLayout;
+import javax.swing.DefaultRowSorter;
 import javax.swing.GroupLayout;
 import javax.swing.GroupLayout.Alignment;
 import javax.swing.JButton;
@@ -32,6 +35,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.LayoutStyle.ComponentPlacement;
 import javax.swing.ListSelectionModel;
+import javax.swing.RowSorter;
 import javax.swing.SwingWorker;
 import javax.swing.UIManager;
 import javax.swing.UIManager.LookAndFeelInfo;
@@ -40,6 +44,7 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.table.TableModel;
+import javax.swing.table.TableRowSorter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,9 +77,7 @@ public class MainWindow extends JFrame {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			// TODO implement
-			tablePeople.getSelectionModel().removeSelectionInterval(0,
-					tablePeople.getRowCount() - 1);
+			//TODO: implement
 		}
 	};
 
@@ -92,14 +95,21 @@ public class MainWindow extends JFrame {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			// TODO Implement
+			
+			int index = tablePeople.convertRowIndexToModel(tablePeople.getSelectedRow());
+			if(index >=0) {
+				(new DuplicateWorker(index)).execute();
+			}
 		}
 	};
 	private final Action removeAction = new AbstractAction() {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			// TODO Implement
+			int index = tablePeople.convertRowIndexToModel(tablePeople.getSelectedRow());
+			if(index>=0) {
+				//(new DeleteWorker(index)).execute();
+			}
 			
 		}
 	};
@@ -118,6 +128,7 @@ public class MainWindow extends JFrame {
 	private JLabel loadText;
 	private JTable tablePeople;
 	private JPopupMenu rightClickMenu;
+	private PersonTableModel tableModel;
 
 	private JMenuBar menuBar;
 	
@@ -279,6 +290,7 @@ public class MainWindow extends JFrame {
 		tablePeople.setDefaultRenderer(Contact.class, new ContactCellRenderer());
 		tablePeople.setDefaultRenderer(Collection.class, new CollectionContactCellRenderer());
 		tablePeople.setDefaultRenderer(Calendar.class, new CalendarCellRenderer());
+		tablePeople.setAutoCreateRowSorter(true);
 		tablePeople.getSelectionModel().addListSelectionListener(
 				new ListSelectionListener() {
 					@Override
@@ -305,19 +317,22 @@ public class MainWindow extends JFrame {
 		
 		
 		initialize(true);
+		
+		
 
 	}
 	
 	/**
 	 * Loads content into the frame
 	 * To run this program with splash, use java -splash:{path to image} MainWindow
-	 * @param longLasting whether it can block the calling thread- use with splash only
+	 * @param blockThread whether it can block the calling thread- use with splash only
 	 */
 	
-	private void initialize(boolean longLasting) {
-		if(longLasting) {
+	private void initialize(boolean blockThread) {
+		if(blockThread) {
 			try {
-				tablePeople.setModel(new PersonTableModel());
+				tableModel = new PersonTableModel();
+				tablePeople.setModel(tableModel);
 				setContentPane(contentPane);
 			} catch (ServiceFailureException e) {
 				log.error("data store exception", e);
@@ -365,21 +380,38 @@ public class MainWindow extends JFrame {
 
 	}
 	
+	private Comparator<Contact> contactComparator = new Comparator<Contact>() {
+		
+		@Override
+		public int compare(Contact o1, Contact o2) {
+			return Collator.getInstance().compare(o1.getValue(), o2.getValue());
+		}
+	};
 	
 	
-	private class LoadingWorker extends SwingWorker<TableModel, Void> {
+	private class LoadingWorker extends SwingWorker<PersonTableModel, Void> {
 		
 		
 		public LoadingWorker() {
 			MainWindow.this.setContentPane(loadPanel);
+			loadText.setText(BUNDLE.getString("MainWindow.mainLoadText"));
 			menuBar.setVisible(false);
+			//MainWindow.this.pack();
 		}
 		
 		@Override
 		protected void done() {
 			try {
-				TableModel model = get();
-				tablePeople.setModel(model);
+				tableModel = get();
+				tablePeople.setModel(tableModel);
+				TableRowSorter<TableModel> sorter = new TableRowSorter<TableModel>(tableModel);
+				sorter.setComparator(0, Collator.getInstance());
+				sorter.setComparator(1, contactComparator);
+				sorter.setComparator(2, contactComparator);
+				sorter.setComparator(3, contactComparator);
+				sorter.setComparator(5, contactComparator);
+				tablePeople.setRowSorter(sorter);
+				
 			} catch (ExecutionException e) {
 				if(e.getCause() instanceof ServiceFailureException) {
 					log.error("datastore error", e.getCause());
@@ -395,12 +427,119 @@ public class MainWindow extends JFrame {
 			
 			menuBar.setVisible(true);
 			MainWindow.this.setContentPane(contentPane);
-			MainWindow.this.pack();
+			//MainWindow.this.pack();
 		}
 
 		@Override
-		protected TableModel doInBackground() throws Exception {
-			return new PersonTableModel();
+		protected PersonTableModel doInBackground() throws Exception {
+			if(tableModel==null)
+				return new PersonTableModel();
+			else {
+				tableModel.reloadAllPeople();
+				return tableModel;
+			}
+		}
+		
+	}
+	
+	private class DeleteWorker extends SwingWorker<Void, Void> {
+
+		private int index;
+		
+		public DeleteWorker(int index) {
+			if(index<0)
+				throw new IndexOutOfBoundsException("expected positive index");
+			this.index = index;
+			
+			MainWindow.this.setContentPane(loadPanel);
+			loadText.setText(BUNDLE.getString("MainWindow.deleteText"));
+			menuBar.setVisible(false);
+			//MainWindow.this.pack();
+			
+		}
+		
+	
+		@Override
+		protected void done() {
+			try {
+				get();
+			} catch (ExecutionException e) {
+				if(e.getCause() instanceof ServiceFailureException) {
+					log.error("datastore error", e.getCause());
+					ExceptionDialogs.notifyOfException((Exception)e.getCause(), false, MainWindow.this);
+				} else {
+					log.error("some exception during person deletion", e.getCause());
+					ExceptionDialogs.notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, false, MainWindow.this);
+				}
+			} catch (InterruptedException e) {
+				//shouldn't happen
+				log.error("interrupted error, should never happen!", e);
+				ExceptionDialogs.notifyOfException(e, false, MainWindow.this);
+			} 
+			
+			
+			MainWindow.this.setContentPane(contentPane);
+			menuBar.setVisible(true);
+			//MainWindow.this.pack();
+			
+		}
+
+
+
+
+		@Override
+		protected Void doInBackground() throws Exception {
+			tableModel.removePerson(index);
+			return null;
+		}
+		
+		
+	}
+	
+	private class DuplicateWorker extends SwingWorker<Void, Void> {
+		private int index;
+		
+		public DuplicateWorker(int index) {
+			if(index<0)
+				throw new IndexOutOfBoundsException("index expected positive");
+			
+			this.index = index;
+			
+			MainWindow.this.setContentPane(loadPanel);
+			loadText.setText(BUNDLE.getString("MainWindow.duplicateText"));
+			menuBar.setVisible(false);
+			//MainWindow.this.pack();
+		}
+		
+		@Override
+		protected void done() {
+			try {
+				get();
+			} catch (ExecutionException e) {
+				if(e.getCause() instanceof ServiceFailureException) {
+					log.error("datastore error", e.getCause());
+					ExceptionDialogs.notifyOfException((Exception)e.getCause(), false, MainWindow.this);
+				} else {
+					log.error("some exception during person duplication", e.getCause());
+					ExceptionDialogs.notifyOfException(e.getCause() instanceof Exception? (Exception)e.getCause() : e, false, MainWindow.this);
+				}
+			} catch (InterruptedException e) {
+				//shouldn't happen
+				log.error("interrupted error, should never happen!", e);
+				ExceptionDialogs.notifyOfException(e, false, MainWindow.this);
+			} 
+			
+			MainWindow.this.setContentPane(contentPane);
+			menuBar.setVisible(true);
+			//MainWindow.this.pack();
+		}
+
+
+
+		@Override
+		protected Void doInBackground() throws Exception {
+			tableModel.duplicatePerson(index);
+			return null;
 		}
 		
 	}
