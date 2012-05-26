@@ -33,12 +33,7 @@ public class PersonForm extends javax.swing.JDialog {
      */
     public PersonForm(java.awt.Frame parent, Person person) {
         super(parent);
-
-        Person person1 = new Person();
-        person1.setId(new Long(220));
-        person1.setName("Martin");
-        person1.setBorn(Calendar.getInstance());
-        this.person = person1;
+        this.person = person;
 
         initComponents();
 
@@ -77,7 +72,7 @@ public class PersonForm extends javax.swing.JDialog {
         java.util.ResourceBundle bundle = java.util.ResourceBundle.getBundle("cz/muni/fi/coffei/addressbook/gui/Windows"); // NOI18N
         setTitle(bundle.getString("PersonForm.title")); // NOI18N
 
-        basicsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(null, bundle.getString("PersonForm.basic"), javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Aharoni CLM", 1, 12))); // NOI18N
+        basicsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(null, bundle.getString("PersonForm.basic"), javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP)); // NOI18N
 
         nameLabel.setText(bundle.getString("PersonForm.nameLabel")); // NOI18N
 
@@ -140,7 +135,7 @@ public class PersonForm extends javax.swing.JDialog {
                     .addComponent(jComboBox3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
         );
 
-        contactsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(null, bundle.getString("PersonForm.contacts"), javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Aharoni CLM", 1, 12))); // NOI18N
+        contactsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(null, bundle.getString("PersonForm.contacts"), javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP)); // NOI18N
 
         contactsTable.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
         contactsTable.setTableHeader(null);
@@ -157,7 +152,7 @@ public class PersonForm extends javax.swing.JDialog {
             .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 163, javax.swing.GroupLayout.PREFERRED_SIZE)
         );
 
-        groupsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(null, bundle.getString("PersonForm.inGroup"), javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Aharoni CLM", 1, 12))); // NOI18N
+        groupsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(null, bundle.getString("PersonForm.inGroup"), javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP)); // NOI18N
 
         groupList.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent evt) {
