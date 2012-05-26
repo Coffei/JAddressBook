@@ -35,10 +35,10 @@ public class PersonForm extends javax.swing.JDialog {
         super(parent);
 
         Person person1 = new Person();
-        person1.setId(new Long(215));
+        person1.setId(new Long(220));
         person1.setName("Martin");
         person1.setBorn(Calendar.getInstance());
-        //this.person = person1;
+        this.person = person1;
 
         initComponents();
 
@@ -71,6 +71,7 @@ public class PersonForm extends javax.swing.JDialog {
         submitButton = new javax.swing.JButton();
         cancelButton = new javax.swing.JButton();
         addContactButton = new javax.swing.JButton();
+        deleteContactButton = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         java.util.ResourceBundle bundle = java.util.ResourceBundle.getBundle("cz/muni/fi/coffei/addressbook/gui/Windows"); // NOI18N
@@ -141,6 +142,7 @@ public class PersonForm extends javax.swing.JDialog {
 
         contactsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(null, bundle.getString("PersonForm.contacts"), javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Aharoni CLM", 1, 12))); // NOI18N
 
+        contactsTable.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
         contactsTable.setTableHeader(null);
         jScrollPane2.setViewportView(contactsTable);
 
@@ -157,6 +159,11 @@ public class PersonForm extends javax.swing.JDialog {
 
         groupsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(null, bundle.getString("PersonForm.inGroup"), javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Aharoni CLM", 1, 12))); // NOI18N
 
+        groupList.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                groupListMouseClicked(evt);
+            }
+        });
         jScrollPane1.setViewportView(groupList);
 
         javax.swing.GroupLayout groupsPanelLayout = new javax.swing.GroupLayout(groupsPanel);
@@ -193,6 +200,13 @@ public class PersonForm extends javax.swing.JDialog {
             }
         });
 
+        deleteContactButton.setText(bundle.getString("PersonForm.deleteContactButton")); // NOI18N
+        deleteContactButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                deleteContactButtonActionPerformed(evt);
+            }
+        });
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
@@ -205,8 +219,10 @@ public class PersonForm extends javax.swing.JDialog {
                     .addComponent(basicsPanel, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addGroup(layout.createSequentialGroup()
                         .addComponent(submitButton)
-                        .addGap(108, 108, 108)
+                        .addGap(58, 58, 58)
                         .addComponent(addContactButton)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(deleteContactButton)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .addComponent(cancelButton)))
                 .addContainerGap())
@@ -224,7 +240,8 @@ public class PersonForm extends javax.swing.JDialog {
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(submitButton)
                     .addComponent(cancelButton)
-                    .addComponent(addContactButton))
+                    .addComponent(addContactButton)
+                    .addComponent(deleteContactButton))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
@@ -244,8 +261,20 @@ public class PersonForm extends javax.swing.JDialog {
     }//GEN-LAST:event_submitButtonActionPerformed
 
     private void addContactButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addContactButtonActionPerformed
-        // TODO add your handling code here:
+        ContactsTableModel model = (ContactsTableModel) contactsTable.getModel();
+        model.addContact(new Contact());
     }//GEN-LAST:event_addContactButtonActionPerformed
+
+    private void deleteContactButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteContactButtonActionPerformed
+        ContactsTableModel model = (ContactsTableModel) contactsTable.getModel();
+        model.deleteContact(contactsTable.getSelectedRow());
+    }//GEN-LAST:event_deleteContactButtonActionPerformed
+
+    private void groupListMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_groupListMouseClicked
+        BoolWrapper<Group> wrapper = (BoolWrapper<Group>) groupList.getSelectedValue();
+        wrapper.value ^= true;
+        groupList.repaint();
+    }//GEN-LAST:event_groupListMouseClicked
 
     /**
      * @param args the command line arguments
@@ -303,6 +332,7 @@ public class PersonForm extends javax.swing.JDialog {
     private javax.swing.JButton cancelButton;
     private javax.swing.JPanel contactsPanel;
     private javax.swing.JTable contactsTable;
+    private javax.swing.JButton deleteContactButton;
     private javax.swing.JList groupList;
     private javax.swing.JPanel groupsPanel;
     private javax.swing.JComboBox jComboBox1;
@@ -365,7 +395,7 @@ public class PersonForm extends javax.swing.JDialog {
             Contact contact = list.get(rowIndex);
             switch (columnIndex) {
                 case 0:
-                    return contact.getType() + ": ";
+                    return contact.getType();
                 case 1:
                     return contact.getValue();
                 default:
@@ -378,6 +408,12 @@ public class PersonForm extends javax.swing.JDialog {
             int lastRow = list.size() - 1;
             fireTableRowsInserted(lastRow, lastRow);
         }
+        
+        public void deleteContact(int rowIndex){
+            list.remove(rowIndex);
+            int lastRow = list.size() - 1;
+            fireTableRowsDeleted(lastRow, lastRow);
+        }
 
         public Contact getContactFromRow(int row) {
             return list.get(row);
@@ -385,6 +421,46 @@ public class PersonForm extends javax.swing.JDialog {
 
         public int getSize() {
             return list.size();
+        }
+
+        @Override
+        public Class<?> getColumnClass(int columnIndex) {
+            switch (columnIndex) {
+                case 0:
+                case 1:
+                    return String.class;
+
+                default:
+                    throw new IllegalArgumentException("columnIndex");
+            }
+        }
+
+        @Override
+        public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
+            Contact contact = list.get(rowIndex);
+            switch (columnIndex) {
+                case 0:
+                    contact.setType((String) aValue);
+                    break;
+                case 1:
+                    contact.setValue((String) aValue);
+                    break;
+                default:
+                    throw new IllegalArgumentException("columnIndex");
+            }
+            fireTableCellUpdated(rowIndex, columnIndex);
+        }
+
+        @Override
+        public boolean isCellEditable(int rowIndex, int columnIndex) {
+            switch (columnIndex) {
+                case 0: 
+                case 1:
+                    return true;
+                default:
+                    throw new IllegalArgumentException("columnIndex");
+            }
+            
         }
     }
 
@@ -480,7 +556,7 @@ public class PersonForm extends javax.swing.JDialog {
             }
         }
     }
-
+    
     private class LoadingWorker extends SwingWorker<ContactsTableModel, Void> {
 
         @Override
@@ -507,6 +583,18 @@ public class PersonForm extends javax.swing.JDialog {
     }
 
     private class SavingWorker extends SwingWorker<Void, Void> {
+        
+        protected void done(){
+            try {
+                get();
+            } catch (InterruptedException ex) {
+                log.error("Interupt error", ex);
+                ExceptionDialogs.notifyOfException((Exception) ex.getCause(), true, PersonForm.this);
+            } catch (ExecutionException ex) {
+                log.error("Datasource error", ex);
+                ExceptionDialogs.notifyOfException((Exception) ex.getCause(), true, PersonForm.this);
+            }
+        }
 
         @Override
         protected Void doInBackground() throws Exception {
@@ -515,6 +603,7 @@ public class PersonForm extends javax.swing.JDialog {
             }
             PersonManager pman = appCtx.getBean("personManager", PersonManager.class);
             ContactManager cman = appCtx.getBean("contactManager", ContactManager.class);
+            GroupManager gman = appCtx.getBean("groupManager", GroupManager.class);
 
             if (person == null) {
                 Person person = new Person();
@@ -530,6 +619,14 @@ public class PersonForm extends javax.swing.JDialog {
                 for (int i = 0; i < model.getSize(); i++) {
                     Contact contact = model.getContactFromRow(i);
                     cman.createContact(contact, person);
+                }
+                
+                ListModel lmodel = groupList.getModel();
+                for(int i = 0; i< lmodel.getSize(); i++){
+                    BoolWrapper<Group> wrapper = (BoolWrapper<Group>) lmodel.getElementAt(i);
+                    if(wrapper.value == true){
+                        gman.addPersonToGroup(person, wrapper.object);
+                    }
                 }
 
 
@@ -550,7 +647,20 @@ public class PersonForm extends javax.swing.JDialog {
                         cman.updateContact(contact);
                     }
                 }
+                
+                ListModel lmodel = groupList.getModel();
+                List<Group> assignedGroups = gman.findGroupsByPerson(person);
+                for(int i = 0; i < lmodel.getSize(); i++){
+                    BoolWrapper<Group> wrapper = (BoolWrapper<Group>) lmodel.getElementAt(i);
+                    if(wrapper.value && !assignedGroups.contains(wrapper.object)){
+                        gman.addPersonToGroup(person, wrapper.object);
+                    } else if(!wrapper.value && assignedGroups.contains(wrapper.object)){
+                        gman.removePersonFromGroup(person, wrapper.object);
+                    }
+                }
             }
+            
+            
 
             return null;
         }
