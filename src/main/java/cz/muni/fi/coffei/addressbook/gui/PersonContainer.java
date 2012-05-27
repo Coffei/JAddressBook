@@ -7,12 +7,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import cz.muni.fi.coffei.addressbook.gui.PersonTableModel.ContactType;
 import cz.muni.fi.pv168.Contact;
 import cz.muni.fi.pv168.Person;
 
 /**
- * For internal use ONLY!
+ * 
  * @author Coffei
  *
  */
@@ -57,7 +56,8 @@ public class PersonContainer extends Person {
 	}
 	
 	/**
-	 * Converts current instance into Person
+	 * Converts current instance into a new instance of Person.
+	 * It's like copying this object, but limiting it to Person
 	 * @return Person instance
 	 */
 	public Person getPerson() {
@@ -78,6 +78,12 @@ public class PersonContainer extends Person {
 	
 	public Collection<Contact> getOtherContacts() {
 		return Collections.unmodifiableCollection(other);
+	}
+	
+
+	enum ContactType {
+		EMAIL, MOBILE, ADDRESS, NICK
+
 	}
 
 }

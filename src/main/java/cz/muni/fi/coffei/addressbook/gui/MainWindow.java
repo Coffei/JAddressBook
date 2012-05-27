@@ -1,13 +1,16 @@
 package cz.muni.fi.coffei.addressbook.gui;
 
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dialog.ModalityType;
 import java.awt.Dimension;
 import java.awt.EventQueue;
+import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.text.Collator;
 import java.util.Calendar;
@@ -19,7 +22,6 @@ import java.util.concurrent.ExecutionException;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.BoxLayout;
-import javax.swing.DefaultRowSorter;
 import javax.swing.GroupLayout;
 import javax.swing.GroupLayout.Alignment;
 import javax.swing.JButton;
@@ -33,22 +35,28 @@ import javax.swing.JPopupMenu;
 import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.LayoutStyle.ComponentPlacement;
 import javax.swing.ListSelectionModel;
-import javax.swing.RowSorter;
 import javax.swing.SwingWorker;
 import javax.swing.UIManager;
 import javax.swing.UIManager.LookAndFeelInfo;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.PlainDocument;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import cz.muni.fi.coffei.addressbook.gui.PersonTableModel.ContainsFilter;
 import cz.muni.fi.pv168.Contact;
 import cz.muni.fi.pv168.ServiceFailureException;
 
@@ -77,7 +85,15 @@ public class MainWindow extends JFrame {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			//TODO: implement
+			PersonForm form = new PersonForm(MainWindow.this, null);
+			form.addWindowListener(new WindowAdapter() {
+				@Override
+				public void windowClosed(WindowEvent e) {
+					new LoadingWorker().execute();
+				}
+			});
+			form.setModalityType(ModalityType.APPLICATION_MODAL);
+			form.setVisible(true);
 		}
 	};
 
@@ -85,7 +101,18 @@ public class MainWindow extends JFrame {
 
 		@Override
 		public void actionPerformed(ActionEvent e) {
-			// TODO Implement
+			int index = tablePeople.convertRowIndexToModel(tablePeople.getSelectedRow());
+			if(index >=0) {
+				PersonForm form = new PersonForm(MainWindow.this,tableModel.getPersonAt(index));
+				form.addWindowListener(new WindowAdapter() {
+					@Override
+					public void windowClosed(WindowEvent e) {
+						new LoadingWorker().execute();
+					}
+				});
+				form.setModalityType(ModalityType.APPLICATION_MODAL);
+				form.setVisible(true);
+			}
 
 		}
 
@@ -108,7 +135,7 @@ public class MainWindow extends JFrame {
 		public void actionPerformed(ActionEvent e) {
 			int index = tablePeople.convertRowIndexToModel(tablePeople.getSelectedRow());
 			if(index>=0) {
-				//(new DeleteWorker(index)).execute();
+				(new DeleteWorker(index)).execute();
 			}
 			
 		}
@@ -221,6 +248,47 @@ public class MainWindow extends JFrame {
 			}
 		});
 		groupsMenu.add(addGroupItem);
+		
+		panel = new JPanel();
+		panel.setBackground(new Color(0, 0, 0, 0));
+		panel.setDoubleBuffered(true);
+		menuBar.add(panel);
+		panel.setLayout(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+		
+		searchText = new JTextField();
+		searchText.setDocument(new PlainDocument() { //document to set max length
+			private int max = 25;
+			@Override
+			public void insertString(int offs, String str, AttributeSet a)
+					throws BadLocationException {
+				if(getLength() + str.length() > max) {
+					str = str.substring(0, max - getLength());
+				}
+				super.insertString(offs, str, a);
+			}
+			
+			
+		});
+		searchText.getDocument().addDocumentListener(new DocumentListener() {
+			@Override
+			public void removeUpdate(DocumentEvent e) {
+				searchFieldChanged(e);
+			}
+			@Override
+			public void insertUpdate(DocumentEvent e) {
+				searchFieldChanged(e);
+			}
+			@Override
+			public void changedUpdate(DocumentEvent e) {
+				searchFieldChanged(e);
+			}
+		});
+		
+		
+		lblNewLabel = new JLabel(BUNDLE.getString("MainWindow.search")); //$NON-NLS-1$
+		panel.add(lblNewLabel);
+		panel.add(searchText);
+		searchText.setColumns(15);
 		contentPane = new JPanel();
 		contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
 		
@@ -322,6 +390,28 @@ public class MainWindow extends JFrame {
 
 	}
 	
+	
+	protected void searchFieldChanged(DocumentEvent e) {
+		 String text = null;
+		try {
+			text = e.getDocument().getText(0, e.getDocument().getLength());
+		} catch (BadLocationException e1) {
+			log.error("error getting text from document on filtering\nShould neveg occur!!",e);
+		}
+		
+		TableRowSorter<? extends TableModel> sorter = (TableRowSorter<? extends TableModel>) tablePeople.getRowSorter();
+		 if(text!=null && !text.isEmpty()) {
+			 
+			 if(sorter!=null) {
+				 
+				 sorter.setRowFilter((new ContainsFilter(text)));
+			 }
+		 }
+		 else {
+			 sorter.setRowFilter(null);
+		 }
+	}
+
 	/**
 	 * Loads content into the frame
 	 * To run this program with splash, use java -splash:{path to image} MainWindow
@@ -334,8 +424,13 @@ public class MainWindow extends JFrame {
 				tableModel = new PersonTableModel();
 				tablePeople.setModel(tableModel);
 				setContentPane(contentPane);
+				initializeSorter();
 			} catch (ServiceFailureException e) {
 				log.error("data store exception", e);
+				ExceptionDialogs.notifyOfException(e, true, this);
+			}
+			catch (Exception e) {
+				log.error("general exception at mainWindow init", e);
 				ExceptionDialogs.notifyOfException(e, true, this);
 			}
 		} else {
@@ -371,23 +466,51 @@ public class MainWindow extends JFrame {
 		}
 	}
 
-	
+
 	protected void tablePeopleMouseClicked(MouseEvent e) {
-		if (e.getButton() == MouseEvent.BUTTON3
-				&& tablePeople.getSelectedRow() >= 0) {
-			rightClickMenu.show(tablePeople, e.getX(), e.getY());
+		if(e.getClickCount()==2 && e.getButton() == MouseEvent.BUTTON1) { //when table double clicked, perform edit action
+			editAction.actionPerformed(null);
+			e.consume();
+		} else {
+			if (e.getButton() == MouseEvent.BUTTON3
+					&& tablePeople.getSelectedRow() >= 0) { //when table right clicked, bring up the menu
+				rightClickMenu.show(tablePeople, e.getX(), e.getY());
+				e.consume();
+			}
 		}
 
 	}
 	
+	
+
 	private Comparator<Contact> contactComparator = new Comparator<Contact>() {
-		
+
 		@Override
 		public int compare(Contact o1, Contact o2) {
 			return Collator.getInstance().compare(o1.getValue(), o2.getValue());
 		}
 	};
 	
+	private JPanel panel;
+	private JTextField searchText;
+	private JLabel lblNewLabel;
+	
+	
+	private void initializeSorter() {
+		TableRowSorter<TableModel> sorter = new TableRowSorter<TableModel>(tableModel);
+		sorter.setComparator(0, Collator.getInstance());
+		sorter.setComparator(1, contactComparator);
+		sorter.setComparator(2, contactComparator);
+		sorter.setComparator(3, contactComparator);
+		sorter.setComparator(5, contactComparator);
+		//maybe add comparator for collections? guess not needed
+		String text = searchText.getText();
+		if(text!=null && !text.isEmpty()) {
+			sorter.setRowFilter(new ContainsFilter(text));
+		}
+		
+		tablePeople.setRowSorter(sorter);
+	}
 	
 	private class LoadingWorker extends SwingWorker<PersonTableModel, Void> {
 		
@@ -404,13 +527,8 @@ public class MainWindow extends JFrame {
 			try {
 				tableModel = get();
 				tablePeople.setModel(tableModel);
-				TableRowSorter<TableModel> sorter = new TableRowSorter<TableModel>(tableModel);
-				sorter.setComparator(0, Collator.getInstance());
-				sorter.setComparator(1, contactComparator);
-				sorter.setComparator(2, contactComparator);
-				sorter.setComparator(3, contactComparator);
-				sorter.setComparator(5, contactComparator);
-				tablePeople.setRowSorter(sorter);
+				searchText.setText("");
+				initializeSorter();
 				
 			} catch (ExecutionException e) {
 				if(e.getCause() instanceof ServiceFailureException) {
@@ -477,6 +595,7 @@ public class MainWindow extends JFrame {
 				ExceptionDialogs.notifyOfException(e, false, MainWindow.this);
 			} 
 			
+			initializeSorter();
 			
 			MainWindow.this.setContentPane(contentPane);
 			menuBar.setVisible(true);
@@ -504,6 +623,8 @@ public class MainWindow extends JFrame {
 				throw new IndexOutOfBoundsException("index expected positive");
 			
 			this.index = index;
+			
+			initializeSorter();
 			
 			MainWindow.this.setContentPane(loadPanel);
 			loadText.setText(BUNDLE.getString("MainWindow.duplicateText"));

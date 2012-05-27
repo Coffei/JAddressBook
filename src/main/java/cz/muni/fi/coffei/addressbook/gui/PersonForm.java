@@ -4,18 +4,41 @@
  */
 package cz.muni.fi.coffei.addressbook.gui;
 
-import cz.muni.fi.pv168.*;
 import java.awt.Component;
-import java.util.*;
+import java.awt.Window;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.List;
+import java.util.ResourceBundle;
 import java.util.concurrent.ExecutionException;
-import java.util.logging.Level;
-import javax.swing.*;
+
+import javax.swing.BoxLayout;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.DefaultListModel;
+import javax.swing.JCheckBox;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JProgressBar;
+import javax.swing.ListCellRenderer;
+import javax.swing.ListModel;
+import javax.swing.SwingWorker;
+import javax.swing.border.EmptyBorder;
 import javax.swing.table.AbstractTableModel;
-import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableModel;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
+
+import cz.muni.fi.pv168.Contact;
+import cz.muni.fi.pv168.ContactManager;
+import cz.muni.fi.pv168.DBUtils;
+import cz.muni.fi.pv168.Group;
+import cz.muni.fi.pv168.GroupManager;
+import cz.muni.fi.pv168.Person;
+import cz.muni.fi.pv168.PersonManager;
+import cz.muni.fi.pv168.ServiceFailureException;
 
 /**
  *
@@ -24,14 +47,18 @@ import org.springframework.context.ApplicationContext;
 public class PersonForm extends javax.swing.JDialog {
 
     private static final Logger log = LoggerFactory.getLogger(GroupForm.class);
+    private static final ResourceBundle bundle = ResourceBundle.getBundle("cz/muni/fi/coffei/addressbook/gui/Windows"); // NOI18N
     private ApplicationContext appCtx = null;
     private Person person = null;
-    private List<Contact> assignedContacts = Collections.EMPTY_LIST;
+    private List<Contact> assignedContacts = Collections.emptyList();
+    
+    //bool to sync loaders
+    private boolean isFinished = false;
 
     /**
      * Creates new form PersonForm
      */
-    public PersonForm(java.awt.Frame parent, Person person) {
+    public PersonForm(Window parent, Person person) {
         super(parent);
         this.person = person;
 
@@ -62,14 +89,17 @@ public class PersonForm extends javax.swing.JDialog {
         contactsTable = new javax.swing.JTable();
         groupsPanel = new javax.swing.JPanel();
         jScrollPane1 = new javax.swing.JScrollPane();
-        groupList = new javax.swing.JList();
+        groupList = new JList<BoolWrapper<Group>>();
         submitButton = new javax.swing.JButton();
         cancelButton = new javax.swing.JButton();
         addContactButton = new javax.swing.JButton();
         deleteContactButton = new javax.swing.JButton();
+        contentPanel = new JPanel();
+        
+        
+        setContentPane(contentPanel);
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
-        java.util.ResourceBundle bundle = java.util.ResourceBundle.getBundle("cz/muni/fi/coffei/addressbook/gui/Windows"); // NOI18N
         setTitle(bundle.getString("PersonForm.title")); // NOI18N
 
         basicsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(null, bundle.getString("PersonForm.basic"), javax.swing.border.TitledBorder.LEADING, javax.swing.border.TitledBorder.TOP)); // NOI18N
@@ -202,8 +232,8 @@ public class PersonForm extends javax.swing.JDialog {
             }
         });
 
-        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
-        getContentPane().setLayout(layout);
+        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(contentPanel);
+      contentPanel.setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
@@ -239,6 +269,20 @@ public class PersonForm extends javax.swing.JDialog {
                     .addComponent(deleteContactButton))
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
+        
+        loadPanel = new JPanel();
+		loadPanel.setLayout(new BoxLayout(loadPanel, BoxLayout.Y_AXIS));
+		{
+			loadText = new JLabel(bundle.getString("PersonForm.mainLoadText"));
+			loadText.setBorder(new EmptyBorder(60, 0, 10, 0));
+			loadText.setAlignmentX(Component.CENTER_ALIGNMENT);
+			loadPanel.add(loadText);
+		}
+		{
+			JProgressBar loadProgress = new JProgressBar();
+			loadProgress.setIndeterminate(true);
+			loadPanel.add(loadProgress);
+		}
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
@@ -246,13 +290,11 @@ public class PersonForm extends javax.swing.JDialog {
     private void cancelButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cancelButtonActionPerformed
         this.setVisible(false);
         this.dispose();
-        System.exit(0);
+        
     }//GEN-LAST:event_cancelButtonActionPerformed
 
     private void submitButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_submitButtonActionPerformed
         new SavingWorker().execute();
-        this.setVisible(false);
-        this.dispose();
     }//GEN-LAST:event_submitButtonActionPerformed
 
     private void addContactButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addContactButtonActionPerformed
@@ -266,9 +308,11 @@ public class PersonForm extends javax.swing.JDialog {
     }//GEN-LAST:event_deleteContactButtonActionPerformed
 
     private void groupListMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_groupListMouseClicked
-        BoolWrapper<Group> wrapper = (BoolWrapper<Group>) groupList.getSelectedValue();
-        wrapper.value ^= true;
-        groupList.repaint();
+    	BoolWrapper<Group> wrapper = (BoolWrapper<Group>) groupList.getSelectedValue();
+    	if(wrapper!=null) {
+    		wrapper.value ^= true;
+    		groupList.repaint();
+    	}
     }//GEN-LAST:event_groupListMouseClicked
 
     /**
@@ -328,7 +372,7 @@ public class PersonForm extends javax.swing.JDialog {
     private javax.swing.JPanel contactsPanel;
     private javax.swing.JTable contactsTable;
     private javax.swing.JButton deleteContactButton;
-    private javax.swing.JList groupList;
+    private javax.swing.JList<BoolWrapper<Group>> groupList;
     private javax.swing.JPanel groupsPanel;
     private javax.swing.JComboBox jComboBox1;
     private javax.swing.JComboBox jComboBox2;
@@ -338,19 +382,23 @@ public class PersonForm extends javax.swing.JDialog {
     private javax.swing.JLabel nameLabel;
     private javax.swing.JTextField nameText;
     private javax.swing.JButton submitButton;
+    private JPanel contentPanel;
+    //load stuff
+    private JPanel loadPanel;
+	private JLabel loadText;
     // End of variables declaration//GEN-END:variables
 
     private class ContactsTableModel extends AbstractTableModel {
 
         private ApplicationContext appCtx = DBUtils.getAppContext();
         private ContactManager contactManager = null;
-        private PersonManager personManager = null;
+        //private PersonManager personManager = null;
         private List<Contact> list = null;
-        private Person person = null;
+       // private Person person = null;
 
         public ContactsTableModel(Person person) throws ServiceFailureException {
             contactManager = appCtx.getBean("contactManager", ContactManager.class);
-            personManager = appCtx.getBean("personManager", PersonManager.class);
+            //personManager = appCtx.getBean("personManager", PersonManager.class);
 
             if (person == null) {
                 list = new ArrayList<>();
@@ -501,6 +549,11 @@ public class PersonForm extends javax.swing.JDialog {
 
     private class GroupsLoadingWorker extends SwingWorker<ListModel<BoolWrapper<Group>>, Void> {
 
+    	public GroupsLoadingWorker() { 
+    		PersonForm.this.setContentPane(loadPanel);
+    		loadText.setText(bundle.getString("PersonForm.mainLoadText"));
+    	}
+    	
         @Override
         protected ListModel<BoolWrapper<Group>> doInBackground() throws Exception {
             if (appCtx == null) {
@@ -549,11 +602,22 @@ public class PersonForm extends javax.swing.JDialog {
                 log.error("datastore error", ex.getCause());
                 ExceptionDialogs.notifyOfException((Exception) ex.getCause(), true, PersonForm.this);
             }
+            
+            if(isFinished) {
+          	  PersonForm.this.setContentPane(contentPanel);
+            } else {
+          	  isFinished = true;
+            }
         }
     }
     
     private class LoadingWorker extends SwingWorker<ContactsTableModel, Void> {
 
+    	public LoadingWorker() { 
+    		PersonForm.this.setContentPane(loadPanel);
+    		loadText.setText(bundle.getString("PersonForm.mainLoadText"));
+    	}
+    	
         @Override
         protected void done() {
 
@@ -569,6 +633,14 @@ public class PersonForm extends javax.swing.JDialog {
                 log.error("Interupt error", ex);
                 ExceptionDialogs.notifyOfException((Exception) ex.getCause(), true, PersonForm.this);
             }
+            
+            // no need for synchronization, because all done()s always run in one thread
+          if(isFinished) {
+        	  PersonForm.this.setContentPane(contentPanel);
+          } else {
+        	  isFinished = true;
+          }
+            
         }
 
         @Override
@@ -579,6 +651,12 @@ public class PersonForm extends javax.swing.JDialog {
 
     private class SavingWorker extends SwingWorker<Void, Void> {
         
+    	public SavingWorker() {
+    		PersonForm.this.setContentPane(loadPanel);
+    		loadText.setText(bundle.getString("PersonForm.saveText"));
+    	}
+    	
+    	
         protected void done(){
             try {
                 get();
@@ -589,6 +667,9 @@ public class PersonForm extends javax.swing.JDialog {
                 log.error("Datasource error", ex);
                 ExceptionDialogs.notifyOfException((Exception) ex.getCause(), true, PersonForm.this);
             }
+            
+            PersonForm.this.setVisible(false);
+            PersonForm.this.dispose();
         }
 
         @Override

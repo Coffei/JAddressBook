@@ -1,17 +1,19 @@
 package cz.muni.fi.coffei.addressbook.gui;
 
+import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.ResourceBundle;
 
+import javax.swing.RowFilter;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.table.TableModel;
 
 import org.springframework.context.ApplicationContext;
 
+import cz.muni.fi.coffei.addressbook.gui.PersonContainer.ContactType;
 import cz.muni.fi.pv168.Contact;
 import cz.muni.fi.pv168.ContactManager;
 import cz.muni.fi.pv168.DBUtils;
@@ -38,7 +40,7 @@ public class PersonTableModel extends AbstractTableModel {
 		reloadAllPeople();
 	}
 
-
+	
 
 
 	public void reloadAllPeople() throws ServiceFailureException {
@@ -50,7 +52,7 @@ public class PersonTableModel extends AbstractTableModel {
 		List<Person> allpeople = personMan.findAllPersons();
 		for(Person p : allpeople) {
 			PersonContainer pc = new PersonContainer(p);
-			List<Contact> contacts = new ArrayList();//contactMan.findContactsByPerson(p);
+			List<Contact> contacts = contactMan.findContactsByPerson(p);
 			for(Contact c : contacts) {
 				pc.addContact(c);
 			}
@@ -99,8 +101,14 @@ public class PersonTableModel extends AbstractTableModel {
 		//simulate changes
 		people.add(newPerson);
 
-		fireTableRowsUpdated(people.size() - 1, people.size() - 1);
-
+		fireTableDataChanged();
+	}
+	
+	public Person getPersonAt(int index) {
+		if (index < 0 || index >= people.size())
+			throw new IndexOutOfBoundsException("index expected between 0 and " + people.size());
+		
+		return people.get(index).getPerson();
 	}
 
 
@@ -178,13 +186,63 @@ public class PersonTableModel extends AbstractTableModel {
 		return false;
 	}
 
+	//Filter
+	public static class ContainsFilter extends RowFilter<TableModel, Integer> {
 
+		private String contains;
+		DateFormat format = DateFormat.getDateInstance(DateFormat.MEDIUM);
+		
+		public ContainsFilter(String contains) {
+			this.contains = contains.toLowerCase();
+		}
 
-
-	enum ContactType {
-		EMAIL, MOBILE, ADDRESS, NICK
-
+		@Override
+		public boolean include(
+				javax.swing.RowFilter.Entry<? extends TableModel, ? extends Integer> entry) {
+			TableModel model = entry.getModel();
+			int index = entry.getIdentifier().intValue();
+			
+			String name = (String) model.getValueAt(index, 0);
+			if(name!=null && name.toLowerCase().contains(contains))
+				return true;
+			
+			Contact c = (Contact) model.getValueAt(index, 1);
+			if(c.getValue()!=null && c.getValue().toLowerCase().contains(contains))
+				return true;
+			
+			c = (Contact) model.getValueAt(index, 2);
+			if(c.getValue()!=null && c.getValue().toLowerCase().contains(contains))
+				return true;
+			
+			c = (Contact) model.getValueAt(index, 3);
+			if(c.getValue()!=null && c.getValue().toLowerCase().contains(contains))
+				return true;
+			
+			c = (Contact) model.getValueAt(index, 5);
+			if(c.getValue()!=null && c.getValue().toLowerCase().contains(contains))
+				return true;
+			
+			Calendar cal = (Calendar) model.getValueAt(index, 4);
+			if(cal!=null && format.format(cal.getTime()).contains(contains))
+				return true;
+			
+			Collection<Contact> collection = (Collection<Contact>) model.getValueAt(index, 6);
+			if(collection!=null) {
+				for(Contact contact : collection) {
+					if(contact.getValue().toLowerCase().contains(contains) ||
+							contact.getType().toLowerCase().contains(contains))
+						return true;
+				}
+			}
+			
+			return false;
+			
+		}
+		
 	}
+
+
+
 
 }
 
